@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { UtilisateurDTO } from '@/types/entities';
 import { UserPlus } from 'lucide-react';
+import { useCategorieEmployes } from '@/hooks/useCategorieEmployes';
 
 const changeCategorySchema = z.object({
   cadre: z.string().min(1, 'La catégorie est requise'),
@@ -33,6 +34,8 @@ export function ChangeCategoryModal({
   changeCategory, 
   isChanging 
 }: ChangeCategoryModalProps) {
+  const { categories } = useCategorieEmployes({ size: 100 }); // Récupérer toutes les catégories
+  
   const {
     register,
     handleSubmit,
@@ -60,8 +63,8 @@ export function ChangeCategoryModal({
     onClose();
   };
 
-  // Suggestions de catégories communes
-  const categorySuggestions = [
+  // Suggestions de catégories communes (fallback)
+  const fallbackSuggestions = [
     'Cadre',
     'Employé',
     'Stagiaire',
@@ -71,6 +74,9 @@ export function ChangeCategoryModal({
     'Directeur',
     'Assistant',
   ];
+
+  // Utiliser les catégories de l'API ou le fallback
+  const categorySuggestions = categories?.content?.map(c => c.cadre) || fallbackSuggestions;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
