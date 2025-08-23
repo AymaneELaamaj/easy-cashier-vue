@@ -67,6 +67,15 @@ export function Users() {
     isChangingCategory
   } = useUsers({ page, size: pageSize });
 
+  // Debug logs
+  console.log('🔧 Users page state:', {
+    users,
+    isLoading,
+    error,
+    page,
+    pageSize
+  });
+
   const handleEdit = (user: UtilisateurDTO) => {
     setSelectedUser(user);
     setShowEditModal(true);

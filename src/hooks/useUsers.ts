@@ -7,10 +7,20 @@ import toast from 'react-hot-toast';
 export const useUsers = (pageable?: Pageable) => {
   const queryClient = useQueryClient();
 
-  // Query principale pour lister les utilisateurs
+  // Query principale pour lister les utilisateurs  
   const usersQuery = useQuery({
     queryKey: ['users', pageable],
-    queryFn: () => usersAPI.getAllUsers(pageable),
+    queryFn: async () => {
+      console.log('🔍 Fetching users with pageable:', pageable);
+      try {
+        const result = await usersAPI.getAllUsers(pageable);
+        console.log('✅ Users fetched successfully:', result);
+        return result;
+      } catch (error) {
+        console.error('❌ Error fetching users:', error);
+        throw error;
+      }
+    },
     staleTime: 2 * 60 * 1000,
   });
 
