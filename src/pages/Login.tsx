@@ -13,7 +13,7 @@ import { LoginRequest } from '@/types/entities';
 import { Eye, EyeOff, LogIn } from 'lucide-react';
 
 const loginSchema = z.object({
-  username: z.string().min(1, 'Nom d\'utilisateur requis'),
+  email: z.string().email('Email invalide').min(1, 'Email requis'),
   password: z.string().min(1, 'Mot de passe requis'),
 });
 
@@ -43,7 +43,7 @@ export function Login() {
   const onSubmit = async (data: LoginForm) => {
     try {
       const credentials: LoginRequest = {
-        username: data.username,
+        email: data.email,
         password: data.password,
       };
       
@@ -71,17 +71,17 @@ export function Login() {
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Nom d'utilisateur</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
-                id="username"
-                type="text"
-                placeholder="Entrez votre nom d'utilisateur"
-                {...register('username')}
-                className={errors.username ? 'border-destructive' : ''}
+                id="email"
+                type="email"
+                placeholder="Entrez votre email"
+                {...register('email')}
+                className={errors.email ? 'border-destructive' : ''}
                 disabled={isLoggingIn}
               />
-              {errors.username && (
-                <p className="text-sm text-destructive">{errors.username.message}</p>
+              {errors.email && (
+                <p className="text-sm text-destructive">{errors.email.message}</p>
               )}
             </div>
 

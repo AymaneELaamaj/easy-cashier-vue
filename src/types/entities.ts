@@ -139,8 +139,7 @@ export interface TerminalPOS {
 
 // DTOs pour les requêtes
 export interface LoginRequest {
-  username?: string;
-  email?: string;
+  email: string;
   password: string;
 }
 
