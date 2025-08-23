@@ -18,6 +18,8 @@ import { Articles } from "./pages/Articles";
 import { Badges } from "./pages/Badges";
 import { Transactions } from "./pages/Transactions";
 import { Subventions } from "./pages/Subventions";
+import { Categories } from "./pages/Categories";
+import { Configuration } from "./pages/Configuration";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
 
@@ -78,10 +80,7 @@ const App = () => (
               <Route path="/categories" element={
                 <ProtectedRoute requiredRoles={['ADMIN', 'SUPER_ADMIN']}>
                   <AppLayout>
-                    <div className="text-center py-8">
-                      <h1 className="text-2xl font-bold mb-4">Catégories</h1>
-                      <p className="text-muted-foreground">Page en cours de développement</p>
-                    </div>
+                    <Categories />
                   </AppLayout>
                 </ProtectedRoute>
               } />
@@ -143,10 +142,7 @@ const App = () => (
               <Route path="/config" element={
                 <ProtectedRoute requiredRoles={['ADMIN', 'SUPER_ADMIN']}>
                   <AppLayout>
-                    <div className="text-center py-8">
-                      <h1 className="text-2xl font-bold mb-4">Configuration</h1>
-                      <p className="text-muted-foreground">Page en cours de développement</p>
-                    </div>
+                    <Configuration />
                   </AppLayout>
                 </ProtectedRoute>
               } />

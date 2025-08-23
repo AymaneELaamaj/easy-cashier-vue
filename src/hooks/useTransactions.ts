@@ -9,7 +9,7 @@ export const useTransactions = () => {
   // Query pour l'historique complet
   const historiqueQuery = useQuery({
     queryKey: ['transactions', 'historique'],
-    queryFn: transactionsAPI.getHistorique,
+    queryFn: () => transactionsAPI.getHistorique(),
     staleTime: 1 * 60 * 1000, // 1 minute
   });
 
@@ -93,7 +93,7 @@ export const useTransactionByTicket = (numeroTicket: string) => {
 export const useMyTransactions = () => {
   return useQuery({
     queryKey: ['transactions', 'me'],
-    queryFn: transactionsAPI.getMyTransactions,
+    queryFn: () => transactionsAPI.getMyTransactions(),
     staleTime: 1 * 60 * 1000,
   });
 };

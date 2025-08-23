@@ -142,6 +142,7 @@ export interface ConfigPaiementRequest {
 }
 
 export interface ConfigPaiementDTO {
+  id?: number;
   typePaiement: string;
 }
 

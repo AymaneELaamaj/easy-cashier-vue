@@ -49,15 +49,15 @@ export function Users() {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  const { 
-    users, 
-    isLoading, 
-    error, 
-    createUser, 
-    updateUser, 
-    deleteUser, 
-    chargeBalance, 
-    initializeBalance, 
+  const {
+    users,
+    isLoading,
+    error,
+    createUser,
+    updateUser,
+    deleteUser,
+    chargeBalance,
+    initializeBalance,
     changeCategory,
     isCreating,
     isUpdating,
@@ -66,6 +66,8 @@ export function Users() {
     isInitializingBalance,
     isChangingCategory
   } = useUsers({ page, size: pageSize });
+
+  console.log('Users page data:', { users, isLoading, error });
 
   // Debug logs
   console.log('🔧 Users page state:', {
@@ -197,11 +199,12 @@ export function Users() {
     },
   ];
 
-  const filteredUsers = users?.content?.filter(user =>
+  const usersArray = Array.isArray(users) ? users : users?.content || [];
+  const filteredUsers = usersArray.filter((user: any) =>
     user.prenom?.toLowerCase().includes(search.toLowerCase()) ||
     user.nom?.toLowerCase().includes(search.toLowerCase()) ||
     user.email?.toLowerCase().includes(search.toLowerCase())
-  ) || [];
+  );
 
   if (error) {
     return (
