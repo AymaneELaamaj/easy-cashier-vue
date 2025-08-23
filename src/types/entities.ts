@@ -147,11 +147,13 @@ export interface RegisterRequest {
   nom: string;
   prenom: string;
   email: string;
-  username?: string;
-  telephone?: string;
   password: string;
   role?: string;
-  cadre?: string;
+  cin: string;
+  telephone?: string;
+  solde?: number;
+  isActive?: boolean;
+  categorieEmployesId?: number;
 }
 
 export interface ConfigPaiementRequest {

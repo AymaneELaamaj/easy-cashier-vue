@@ -7,17 +7,23 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { RegisterRequest } from '@/types/entities';
-import { UserRole } from '@/types/api';
+import { useAuth } from '@/hooks/useAuth';
+import { useCategorieEmployes } from '@/hooks/useCategorieEmployes';
 
 const createUserSchema = z.object({
   nom: z.string().min(1, 'Le nom est requis'),
   prenom: z.string().min(1, 'Le prénom est requis'),
   email: z.string().email('Email invalide').min(1, 'Email requis'),
   password: z.string().min(6, 'Le mot de passe doit contenir au moins 6 caractères'),
-  role: z.enum([UserRole.EMPLOYE, UserRole.CAISSIER, UserRole.ADMIN, UserRole.SUPER_ADMIN]),
-  cadre: z.string().optional(),
+  role: z.string().min(1, 'Le rôle est requis'),
+  cin: z.string().min(1, 'Le CIN est requis'),
+  telephone: z.string().optional(),
+  solde: z.number().min(0, 'Le solde doit être positif').optional(),
+  isActive: z.boolean().optional(),
+  categorieEmployesId: z.number().optional(),
 });
 
 type CreateUserForm = z.infer<typeof createUserSchema>;
@@ -37,6 +43,9 @@ export function CreateUserModal({
   createUser, 
   isCreating 
 }: CreateUserModalProps) {
+  const { currentUser } = useAuth();
+  const { categories } = useCategorieEmployes();
+
   const {
     register,
     handleSubmit,
@@ -47,11 +56,31 @@ export function CreateUserModal({
   } = useForm<CreateUserForm>({
     resolver: zodResolver(createUserSchema),
     defaultValues: {
-      role: UserRole.EMPLOYE
+      role: 'EMPLOYE',
+      solde: 0,
+      isActive: true,
     }
   });
 
   const selectedRole = watch('role');
+  const isActive = watch('isActive');
+
+  // Roles disponibles selon le rôle de l'utilisateur connecté
+  const availableRoles = () => {
+    if (currentUser?.role === 'SUPER_ADMIN') {
+      return [
+        { value: 'EMPLOYE', label: 'Employé' },
+        { value: 'CAISSIER', label: 'Caissier' },
+        { value: 'ADMIN', label: 'Administrateur' },
+      ];
+    } else if (currentUser?.role === 'ADMIN') {
+      return [
+        { value: 'EMPLOYE', label: 'Employé' },
+        { value: 'CAISSIER', label: 'Caissier' },
+      ];
+    }
+    return [];
+  };
 
   const onSubmit = async (data: CreateUserForm) => {
     try {
@@ -61,7 +90,11 @@ export function CreateUserModal({
         email: data.email,
         password: data.password,
         role: data.role,
-        cadre: data.cadre || undefined,
+        cin: data.cin,
+        ...(data.telephone && { telephone: data.telephone }),
+        ...(data.solde !== undefined && { solde: data.solde }),
+        ...(data.isActive !== undefined && { isActive: data.isActive }),
+        ...(data.categorieEmployesId && { categorieEmployesId: data.categorieEmployesId }),
       };
       
       await createUser(userData);
@@ -79,7 +112,7 @@ export function CreateUserModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Créer un nouvel utilisateur</DialogTitle>
           <DialogDescription>
@@ -90,7 +123,7 @@ export function CreateUserModal({
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="prenom">Prénom</Label>
+              <Label htmlFor="prenom">Prénom *</Label>
               <Input
                 id="prenom"
                 placeholder="Prénom"
@@ -104,7 +137,7 @@ export function CreateUserModal({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="nom">Nom</Label>
+              <Label htmlFor="nom">Nom *</Label>
               <Input
                 id="nom"
                 placeholder="Nom"
@@ -119,7 +152,7 @@ export function CreateUserModal({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">Email *</Label>
             <Input
               id="email"
               type="email"
@@ -134,11 +167,11 @@ export function CreateUserModal({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Mot de passe</Label>
+            <Label htmlFor="password">Mot de passe *</Label>
             <Input
               id="password"
               type="password"
-              placeholder="Mot de passe"
+              placeholder="Minimum 6 caractères"
               {...register('password')}
               className={errors.password ? 'border-destructive' : ''}
               disabled={isCreating}
@@ -149,20 +182,45 @@ export function CreateUserModal({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="role">Rôle</Label>
+            <Label htmlFor="cin">CIN *</Label>
+            <Input
+              id="cin"
+              placeholder="CIN"
+              {...register('cin')}
+              className={errors.cin ? 'border-destructive' : ''}
+              disabled={isCreating}
+            />
+            {errors.cin && (
+              <p className="text-sm text-destructive">{errors.cin.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="telephone">Téléphone</Label>
+            <Input
+              id="telephone"
+              placeholder="Numéro de téléphone"
+              {...register('telephone')}
+              disabled={isCreating}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="role">Rôle *</Label>
             <Select 
               value={selectedRole} 
-              onValueChange={(value) => setValue('role', value as UserRole)}
+              onValueChange={(value) => setValue('role', value)}
               disabled={isCreating}
             >
               <SelectTrigger className={errors.role ? 'border-destructive' : ''}>
                 <SelectValue placeholder="Sélectionnez un rôle" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={UserRole.EMPLOYE}>Employé</SelectItem>
-                <SelectItem value={UserRole.CAISSIER}>Caissier</SelectItem>
-                <SelectItem value={UserRole.ADMIN}>Administrateur</SelectItem>
-                <SelectItem value={UserRole.SUPER_ADMIN}>Super Administrateur</SelectItem>
+                {availableRoles().map((role) => (
+                  <SelectItem key={role.value} value={role.value}>
+                    {role.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             {errors.role && (
@@ -170,12 +228,55 @@ export function CreateUserModal({
             )}
           </div>
 
+          {selectedRole === 'EMPLOYE' && (
+            <div className="space-y-2">
+              <Label htmlFor="categorieEmployesId">Catégorie d'employé</Label>
+              <Select 
+                onValueChange={(value) => setValue('categorieEmployesId', parseInt(value))}
+                disabled={isCreating}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner une catégorie" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories?.content?.map((category) => (
+                    <SelectItem key={category.id} value={category.id.toString()}>
+                      {category.cadre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="space-y-2">
-            <Label htmlFor="cadre">Catégorie (optionnel)</Label>
+            <Label htmlFor="solde">Solde initial</Label>
             <Input
-              id="cadre"
-              placeholder="Catégorie employé"
-              {...register('cadre')}
+              id="solde"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0.00"
+              {...register('solde', { valueAsNumber: true })}
+              className={errors.solde ? 'border-destructive' : ''}
+              disabled={isCreating}
+            />
+            {errors.solde && (
+              <p className="text-sm text-destructive">{errors.solde.message}</p>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+            <div className="space-y-0.5">
+              <Label htmlFor="isActive">Compte actif</Label>
+              <div className="text-[0.8rem] text-muted-foreground">
+                L'utilisateur peut se connecter et utiliser l'application
+              </div>
+            </div>
+            <Switch
+              id="isActive"
+              checked={isActive}
+              onCheckedChange={(checked) => setValue('isActive', checked)}
               disabled={isCreating}
             />
           </div>
