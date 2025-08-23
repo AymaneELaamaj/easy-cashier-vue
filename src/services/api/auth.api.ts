@@ -7,19 +7,22 @@ export const authAPI = {
   login: async (credentials: LoginRequest): Promise<UtilisateurDTO> => {
     const response = await api.post<ApiResponse<UtilisateurDTO>>('/auth/login', credentials);
     
-    // Supposons que les tokens sont dans la réponse ou les headers
     const { data } = response.data;
     
-    // Si les tokens sont dans les headers (exemple)
-    const accessToken = response.headers['authorization']?.replace('Bearer ', '') || 
-                       response.headers['x-access-token'];
-    const refreshToken = response.headers['x-refresh-token'];
+    // Extraire les tokens du corps de la réponse (Spring Boot standard)
+    const accessToken = (data as any)?.token || (data as any)?.accessToken || (response.data as any)?.token;
+    const refreshToken = (data as any)?.refreshToken || (response.data as any)?.refreshToken;
     
-    if (accessToken) {
-      tokenManager.setAccessToken(accessToken);
+    // Fallback: vérifier aussi les headers si nécessaire
+    const headerAccessToken = response.headers['authorization']?.replace('Bearer ', '') || 
+                             response.headers['x-access-token'];
+    const headerRefreshToken = response.headers['x-refresh-token'];
+    
+    if (accessToken || headerAccessToken) {
+      tokenManager.setAccessToken(accessToken || headerAccessToken);
     }
-    if (refreshToken) {
-      tokenManager.setRefreshToken(refreshToken);
+    if (refreshToken || headerRefreshToken) {
+      tokenManager.setRefreshToken(refreshToken || headerRefreshToken);
     }
     
     return data;
