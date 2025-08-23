@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -23,7 +23,7 @@ const createUserSchema = z.object({
   telephone: z.string().optional(),
   solde: z.number().min(0, 'Le solde doit être positif').optional(),
   isActive: z.boolean().optional(),
-  categorieEmployesId: z.number().optional(),
+  categorieEmployesId: z.number().nullable().optional(),
 });
 
 type CreateUserForm = z.infer<typeof createUserSchema>;
@@ -59,11 +59,24 @@ export function CreateUserModal({
       role: 'EMPLOYE',
       solde: 0,
       isActive: true,
+      categorieEmployesId: null,
     }
   });
 
   const selectedRole = watch('role');
   const isActive = watch('isActive');
+
+  // Reset le formulaire quand le modal s'ouvre
+  useEffect(() => {
+    if (open) {
+      reset({
+        role: 'EMPLOYE',
+        solde: 0,
+        isActive: true,
+        categorieEmployesId: null,
+      });
+    }
+  }, [open, reset]);
 
   // Roles disponibles selon le rôle de l'utilisateur connecté
   const availableRoles = () => {
@@ -84,29 +97,53 @@ export function CreateUserModal({
 
   const onSubmit = async (data: CreateUserForm) => {
     try {
+      // Préparer les données pour l'envoi
       const userData: RegisterRequest = {
-        nom: data.nom,
-        prenom: data.prenom,
-        email: data.email,
+        nom: data.nom.trim(),
+        prenom: data.prenom.trim(),
+        email: data.email.trim(),
         password: data.password,
         role: data.role,
-        cin: data.cin,
-        ...(data.telephone && { telephone: data.telephone }),
-        ...(data.solde !== undefined && { solde: data.solde }),
-        ...(data.isActive !== undefined && { isActive: data.isActive }),
-        ...(data.categorieEmployesId && { categorieEmployesId: data.categorieEmployesId }),
+        cin: data.cin.trim(),
+        telephone: data.telephone?.trim() || null,
+        solde: data.solde || 0,
+        isActive: data.isActive !== undefined ? data.isActive : true,
+        // Pour CAISSIER et ADMIN, toujours envoyer null pour categorieEmployesId
+        categorieEmployesId: selectedRole === 'EMPLOYE' && data.categorieEmployesId 
+          ? data.categorieEmployesId 
+          : null,
       };
       
+      console.log('Données envoyées:', userData);
+      
       await createUser(userData);
-      reset();
+      
+      // Reset le formulaire après succès
+      reset({
+        role: 'EMPLOYE',
+        solde: 0,
+        isActive: true,
+        categorieEmployesId: null,
+      });
+      
+      // Appeler onSuccess qui devrait rafraîchir la liste
       onSuccess();
+      
+      // Fermer le modal
+      onClose();
     } catch (error) {
       console.error('Erreur lors de la création:', error);
+      // Ne pas fermer le modal en cas d'erreur pour que l'utilisateur puisse corriger
     }
   };
 
   const handleClose = () => {
-    reset();
+    reset({
+      role: 'EMPLOYE',
+      solde: 0,
+      isActive: true,
+      categorieEmployesId: null,
+    });
     onClose();
   };
 
@@ -209,7 +246,13 @@ export function CreateUserModal({
             <Label htmlFor="role">Rôle *</Label>
             <Select 
               value={selectedRole} 
-              onValueChange={(value) => setValue('role', value)}
+              onValueChange={(value) => {
+                setValue('role', value);
+                // Réinitialiser categorieEmployesId si le rôle n'est pas EMPLOYE
+                if (value !== 'EMPLOYE') {
+                  setValue('categorieEmployesId', null);
+                }
+              }}
               disabled={isCreating}
             >
               <SelectTrigger className={errors.role ? 'border-destructive' : ''}>
@@ -236,7 +279,7 @@ export function CreateUserModal({
                 disabled={isCreating}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner une catégorie" />
+                  <SelectValue placeholder="Sélectionner une catégorie (optionnel)" />
                 </SelectTrigger>
                 <SelectContent>
                   {categories?.content?.map((category) => (
@@ -257,6 +300,7 @@ export function CreateUserModal({
               step="0.01"
               min="0"
               placeholder="0.00"
+              defaultValue="0"
               {...register('solde', { valueAsNumber: true })}
               className={errors.solde ? 'border-destructive' : ''}
               disabled={isCreating}
