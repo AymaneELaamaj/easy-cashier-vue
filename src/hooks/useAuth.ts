@@ -26,7 +26,7 @@ export const useAuth = () => {
     mutationFn: (credentials: LoginRequest) => authAPI.login(credentials),
     onSuccess: (user) => {
       queryClient.setQueryData(['currentUser'], user);
-      toast.success(`Bienvenue, ${user.prenom} ${user.nom}!`);
+      toast.success(user ? `Bienvenue, ${user.prenom ?? ''} ${user.nom ?? ''}`.trim() : 'Connexion réussie');
     },
     onError: (error: any) => {
       console.error('Erreur de connexion:', error);
