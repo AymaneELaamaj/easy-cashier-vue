@@ -26,6 +26,8 @@ export const useAuth = () => {
     mutationFn: (credentials: LoginRequest) => authAPI.login(credentials),
     onSuccess: (user) => {
       queryClient.setQueryData(['currentUser'], user);
+      // Invalider et refetch les données utilisateur pour s'assurer qu'elles sont à jour
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
       toast.success(user ? `Bienvenue, ${user.prenom ?? ''} ${user.nom ?? ''}`.trim() : 'Connexion réussie');
     },
     onError: (error: any) => {
@@ -58,7 +60,8 @@ export const useAuth = () => {
     return logoutMutation.mutateAsync();
   };
 
-  const isAuthenticated = !!tokenManager.getAccessToken() && !!currentUser;
+  // Un utilisateur est authentifié s'il a un token valide (currentUser sera chargé automatiquement)
+  const isAuthenticated = !!tokenManager.getAccessToken();
 
   const hasRole = (requiredRole: string | string[]): boolean => {
     if (!currentUser) return false;
