@@ -10,8 +10,26 @@ export const usersAPI = {
     if (pageable?.size !== undefined) params.append('size', pageable.size.toString());
     if (pageable?.sort) params.append('sort', pageable.sort);
 
-    const response = await api.get<ApiResponse<Page<UtilisateurDTO>>>(`/utilisateurs/all?${params}`);
-    return response.data.data;
+    const qs = params.toString();
+    const response = await api.get(`/utilisateurs/all${qs ? `?${qs}` : ''}`);
+    const raw: any = response.data;
+    const page: any = raw?.data ?? raw?.payload ?? raw;
+
+    if (!page) {
+      console.warn('Users API: unexpected response shape', raw);
+      return {
+        content: [],
+        totalElements: 0,
+        totalPages: 0,
+        size: pageable?.size ?? 0,
+        number: pageable?.page ?? 0,
+        first: true,
+        last: true,
+        empty: true,
+      } as Page<UtilisateurDTO>;
+    }
+
+    return page as Page<UtilisateurDTO>;
   },
 
   // Lister les utilisateurs non assignés
