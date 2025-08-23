@@ -13,6 +13,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Users from "./pages/Users";
+import CategorieEmployes from "./pages/CategorieEmployes";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
 
@@ -183,10 +184,7 @@ const App = () => (
               <Route path="/categorie-employes" element={
                 <ProtectedRoute requiredRoles={['ADMIN', 'SUPER_ADMIN']}>
                   <AppLayout>
-                    <div className="text-center py-8">
-                      <h1 className="text-2xl font-bold mb-4">Catégories Employés</h1>
-                      <p className="text-muted-foreground">Page en cours de développement</p>
-                    </div>
+                    <CategorieEmployes />
                   </AppLayout>
                 </ProtectedRoute>
               } />
