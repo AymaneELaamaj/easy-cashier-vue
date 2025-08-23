@@ -84,14 +84,6 @@ export function EditCategoryModal({
               <span className="text-sm text-muted-foreground">Catégorie actuelle :</span>
               <span className="font-medium">{category.cadre}</span>
             </div>
-            {category.dateCreation && (
-              <div className="flex items-center justify-between mt-2">
-                <span className="text-sm text-muted-foreground">Créée le :</span>
-                <span className="text-sm">
-                  {new Date(category.dateCreation).toLocaleDateString('fr-FR')}
-                </span>
-              </div>
-            )}
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

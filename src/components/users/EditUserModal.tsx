@@ -17,8 +17,7 @@ const editUserSchema = z.object({
   prenom: z.string().min(1, 'Le prénom est requis'),
   email: z.string().email('Email invalide').min(1, 'Email requis'),
   role: z.enum([UserRole.EMPLOYE, UserRole.CAISSIER, UserRole.ADMIN, UserRole.SUPER_ADMIN]),
-  cadre: z.string().optional(),
-  active: z.boolean(),
+  isActive: z.boolean(),
 });
 
 type EditUserForm = z.infer<typeof editUserSchema>;
@@ -52,7 +51,7 @@ export function EditUserModal({
   });
 
   const selectedRole = watch('role');
-  const isActive = watch('active');
+  const isActive = watch('isActive');
 
   useEffect(() => {
     if (user && open) {
@@ -61,8 +60,7 @@ export function EditUserModal({
         prenom: user.prenom || '',
         email: user.email || '',
         role: user.role as UserRole,
-        cadre: user.cadre || '',
-        active: user.active !== false,
+        isActive: user.isActive !== false,
       });
     }
   }, [user, open, reset]);
@@ -74,8 +72,7 @@ export function EditUserModal({
         prenom: data.prenom,
         email: data.email,
         role: data.role,
-        cadre: data.cadre || undefined,
-        active: data.active,
+        isActive: data.isActive,
       };
       
       await updateUser(user.id, userData);
@@ -163,24 +160,14 @@ export function EditUserModal({
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="cadre">Catégorie</Label>
-            <Input
-              id="cadre"
-              placeholder="Catégorie employé"
-              {...register('cadre')}
-              disabled={isUpdating}
-            />
-          </div>
-
           <div className="flex items-center space-x-2">
             <Switch
-              id="active"
+              id="isActive"
               checked={isActive}
-              onCheckedChange={(checked) => setValue('active', checked)}
+              onCheckedChange={(checked) => setValue('isActive', checked)}
               disabled={isUpdating}
             />
-            <Label htmlFor="active">Compte actif</Label>
+            <Label htmlFor="isActive">Compte actif</Label>
           </div>
 
           <DialogFooter>

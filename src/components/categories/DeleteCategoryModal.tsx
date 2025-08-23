@@ -67,12 +67,6 @@ export function DeleteCategoryModal({
                 <span className="text-muted-foreground">Catégorie :</span>
                 <span className="font-medium">{category.cadre}</span>
               </div>
-              {category.dateCreation && (
-                <div className="flex justify-between mt-1">
-                  <span className="text-muted-foreground">Créée le :</span>
-                  <span>{new Date(category.dateCreation).toLocaleDateString('fr-FR')}</span>
-                </div>
-              )}
             </div>
           </div>
         </div>

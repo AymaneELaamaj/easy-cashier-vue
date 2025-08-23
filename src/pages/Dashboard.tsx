@@ -185,7 +185,7 @@ export function Dashboard() {
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground">Catégorie</span>
-                <span className="font-medium">{currentUser?.cadre || 'Non définie'}</span>
+                <span className="font-medium">{currentUser?.categorieEmployes?.cadre || 'Non définie'}</span>
               </div>
             </div>
             

@@ -133,7 +133,7 @@ export function Users() {
       key: 'cadre',
       header: 'Catégorie',
       render: (value: any, user: UtilisateurDTO) => (
-        <span className="text-sm">{user.cadre || 'Non définie'}</span>
+        <span className="text-sm">{user.categorieEmployes?.cadre || 'Non définie'}</span>
       ),
     },
     {
@@ -146,11 +146,11 @@ export function Users() {
       ),
     },
     {
-      key: 'active',
+      key: 'isActive',
       header: 'Statut',
       render: (value: any, user: UtilisateurDTO) => (
-        <Badge variant={user.active ? 'default' : 'secondary'}>
-          {user.active ? 'Actif' : 'Inactif'}
+        <Badge variant={user.isActive ? 'default' : 'secondary'}>
+          {user.isActive ? 'Actif' : 'Inactif'}
         </Badge>
       ),
     },
@@ -249,7 +249,7 @@ export function Users() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {users?.content?.filter(u => u.active).length || 0}
+              {users?.content?.filter(u => u.isActive).length || 0}
             </div>
           </CardContent>
         </Card>

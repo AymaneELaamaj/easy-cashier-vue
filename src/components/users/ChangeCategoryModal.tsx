@@ -44,7 +44,7 @@ export function ChangeCategoryModal({
   } = useForm<ChangeCategoryForm>({
     resolver: zodResolver(changeCategorySchema),
     defaultValues: {
-      cadre: user.cadre || '',
+      cadre: user.categorieEmployes?.cadre || '',
     }
   });
 
@@ -96,7 +96,7 @@ export function ChangeCategoryModal({
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Catégorie actuelle :</span>
               <span className="font-medium">
-                {user.cadre || 'Non définie'}
+                {user.categorieEmployes?.cadre || 'Non définie'}
               </span>
             </div>
           </div>

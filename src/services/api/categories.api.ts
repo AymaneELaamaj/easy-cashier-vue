@@ -10,31 +10,31 @@ export const categoriesAPI = {
     if (pageable?.size !== undefined) params.append('size', pageable.size.toString());
     if (pageable?.sort) params.append('sort', pageable.sort);
 
-    const response = await api.get<ApiResponse<Page<CategorieDTO>>>(`/categories/?${params}`);
+    const response = await api.get<ApiResponse<Page<CategorieDTO>>>(`/categories/all?${params}`);
     return response.data.data;
   },
 
-  // Obtenir une catégorie par nom
-  getCategoryByName: async (name: string): Promise<CategorieDTO> => {
-    const response = await api.get<ApiResponse<CategorieDTO>>(`/categories/by-name?name=${encodeURIComponent(name)}`);
+  // Obtenir une catégorie par ID
+  getCategoryById: async (id: number): Promise<CategorieDTO> => {
+    const response = await api.get<ApiResponse<CategorieDTO>>(`/categories/${id}`);
     return response.data.data;
   },
 
   // Créer une nouvelle catégorie
   createCategory: async (categoryData: CategorieDTO): Promise<CategorieDTO> => {
-    const response = await api.post<ApiResponse<CategorieDTO>>('/categories/', categoryData);
+    const response = await api.post<ApiResponse<CategorieDTO>>('/categories/create', categoryData);
     return response.data.data;
   },
 
   // Mettre à jour une catégorie
-  updateCategory: async (id: number, newName: string): Promise<CategorieDTO> => {
-    const response = await api.put<ApiResponse<CategorieDTO>>(`/categories/update/${id}?newName=${encodeURIComponent(newName)}`);
+  updateCategory: async (id: number, categoryData: CategorieDTO): Promise<CategorieDTO> => {
+    const response = await api.put<ApiResponse<CategorieDTO>>(`/categories/update/${id}`, categoryData);
     return response.data.data;
   },
 
   // Supprimer une catégorie
   deleteCategory: async (id: number): Promise<void> => {
-    await api.delete(`/categories/delete/${id}`);
+    await api.delete(`/categories/${id}`);
   }
 };
 

@@ -59,15 +59,6 @@ export function CategorieEmployes() {
       ),
     },
     {
-      key: 'dateCreation',
-      header: 'Date de création',
-      render: (value: any, category: CategorieEmployesDTO) => (
-        <span className="text-sm text-muted-foreground">
-          {category.dateCreation ? new Date(category.dateCreation).toLocaleDateString('fr-FR') : '-'}
-        </span>
-      ),
-    },
-    {
       key: 'actions',
       header: 'Actions',
       render: (value: any, category: CategorieEmployesDTO) => (

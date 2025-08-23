@@ -4,67 +4,62 @@ export interface UtilisateurDTO {
   id?: number;
   nom: string;
   prenom: string;
+  cin: string;
   email: string;
-  username?: string;
+  motDePasse?: string;
   telephone?: string;
-  role: string;
-  cadre?: string;
   solde: number;
-  active: boolean;
-  dateCreation?: string;
-  dateModification?: string;
-  badgeId?: number;
+  role: string;
+  isActive: boolean;
+  odooPartnerId?: number;
+  categorieEmployes?: CategorieEmployesDTO;
   badge?: BadgeDTO;
 }
 
 export interface ArticleDTO {
   id?: number;
   nom: string;
-  type: string;
   prix: string;
-  statut: boolean;
-  categorieId?: number;
+  description?: string;
+  codeOdoo?: number;
+  productId?: number;
+  quantite?: number;
+  disponible: boolean;
+  status: boolean;
   categorie?: CategorieDTO;
-  dateCreation?: string;
-  dateModification?: string;
 }
 
 export interface CategorieDTO {
   id?: number;
   libelle: string;
-  dateCreation?: string;
-  dateModification?: string;
+  odooCategoryId?: number;
+  statut: boolean;
 }
 
 export interface CategorieEmployesDTO {
   id?: number;
   cadre: string;
-  dateCreation?: string;
-  dateModification?: string;
 }
 
 export interface BadgeDTO {
   id?: number;
-  codeBadge: string;
-  active?: boolean;
+  codeBadge?: string;
+  active: boolean;
   utilisateurId?: number;
-  utilisateur?: UtilisateurDTO;
-  dateCreation?: string;
-  dateModification?: string;
+  statut: string;
 }
 
 export interface TransactionDTO {
   id?: number;
   numeroTicket: string;
+  date: string;
+  heureTransaction: string;
   montantTotal: number;
-  statut: string;
-  dateTransaction: string;
-  utilisateurId?: number;
+  partSalariale: number;
+  partPatronale: number;
+  typePaiement: string;
   utilisateur?: UtilisateurDTO;
-  articles: ArticleTransactionDTO[];
-  typeTransaction?: string;
-  commentaire?: string;
-  motifAnnulation?: string;
+  articles: ArticleDTO[];
 }
 
 export interface ArticleTransactionDTO {
@@ -78,32 +73,20 @@ export interface ArticleTransactionDTO {
 
 export interface SubventionDTO {
   id?: number;
-  nom: string;
-  description?: string;
   taux: number;
-  plafondJour?: number;
-  plafondSemaine?: number;
-  plafondMois?: number;
-  active: boolean;
-  dateDebut?: string;
-  dateFin?: string;
-  dateCreation?: string;
-  dateModification?: string;
+  articleId: number;
+  plafondJour: number;
+  plafondSemaine: number;
+  plafondMois: number;
+  actif: boolean;
+  categorieEmployesId: number;
 }
 
 export interface RemboursementDTO {
   id?: number;
-  transactionId: number;
-  transaction?: TransactionDTO;
-  utilisateurId?: number;
-  utilisateur?: UtilisateurDTO;
   montant: number;
-  message: string;
-  status: string;
-  dateCreation: string;
-  dateModification?: string;
-  dateReponse?: string;
-  reponseAdmin?: string;
+  motif: string;
+  utilisateur?: UtilisateurDTO;
 }
 
 export interface RapportDTO {
@@ -120,10 +103,8 @@ export interface RapportDTO {
 export interface FeedbackDTO {
   id?: number;
   commentaire: string;
-  utilisateurId?: number;
+  note?: number;
   utilisateur?: UtilisateurDTO;
-  dateCreation: string;
-  dateModification?: string;
 }
 
 export interface TerminalPOS {
@@ -157,6 +138,10 @@ export interface RegisterRequest {
 }
 
 export interface ConfigPaiementRequest {
+  typePaiement: string;
+}
+
+export interface ConfigPaiementDTO {
   typePaiement: string;
 }
 
