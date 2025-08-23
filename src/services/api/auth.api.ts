@@ -5,7 +5,7 @@ import { LoginRequest, UtilisateurDTO } from '@/types/entities';
 export const authAPI = {
   // Connexion
   login: async (credentials: LoginRequest): Promise<UtilisateurDTO> => {
-    const response = await api.post<ApiResponse<LoginRequest>>('/auth/login', credentials);
+    const response = await api.post<ApiResponse<UtilisateurDTO>>('/auth/login', credentials);
     
     // Supposons que les tokens sont dans la réponse ou les headers
     const { data } = response.data;
