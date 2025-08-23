@@ -14,6 +14,10 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Users from "./pages/Users";
 import CategorieEmployes from "./pages/CategorieEmployes";
+import { Articles } from "./pages/Articles";
+import { Badges } from "./pages/Badges";
+import { Transactions } from "./pages/Transactions";
+import { Subventions } from "./pages/Subventions";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
 
@@ -66,10 +70,7 @@ const App = () => (
               <Route path="/articles" element={
                 <ProtectedRoute requiredRoles={['ADMIN', 'SUPER_ADMIN', 'EMPLOYE']}>
                   <AppLayout>
-                    <div className="text-center py-8">
-                      <h1 className="text-2xl font-bold mb-4">Articles</h1>
-                      <p className="text-muted-foreground">Page en cours de développement</p>
-                    </div>
+                    <Articles />
                   </AppLayout>
                 </ProtectedRoute>
               } />
@@ -96,21 +97,15 @@ const App = () => (
               <Route path="/badges" element={
                 <ProtectedRoute requiredRoles={['ADMIN', 'SUPER_ADMIN']}>
                   <AppLayout>
-                    <div className="text-center py-8">
-                      <h1 className="text-2xl font-bold mb-4">Badges</h1>
-                      <p className="text-muted-foreground">Page en cours de développement</p>
-                    </div>
+                    <Badges />
                   </AppLayout>
                 </ProtectedRoute>
               } />
 
               <Route path="/transactions" element={
-                <ProtectedRoute requiredRoles={['ADMIN', 'SUPER_ADMIN', 'EMPLOYE']}>
+                <ProtectedRoute requiredRoles={['ADMIN', 'SUPER_ADMIN']}>
                   <AppLayout>
-                    <div className="text-center py-8">
-                      <h1 className="text-2xl font-bold mb-4">Transactions</h1>
-                      <p className="text-muted-foreground">Page en cours de développement</p>
-                    </div>
+                    <Transactions />
                   </AppLayout>
                 </ProtectedRoute>
               } />
@@ -129,10 +124,7 @@ const App = () => (
               <Route path="/subventions" element={
                 <ProtectedRoute requiredRoles={['ADMIN', 'SUPER_ADMIN']}>
                   <AppLayout>
-                    <div className="text-center py-8">
-                      <h1 className="text-2xl font-bold mb-4">Subventions</h1>
-                      <p className="text-muted-foreground">Page en cours de développement</p>
-                    </div>
+                    <Subventions />
                   </AppLayout>
                 </ProtectedRoute>
               } />
