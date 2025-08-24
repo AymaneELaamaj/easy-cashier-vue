@@ -29,6 +29,16 @@ export const categorieEmployesAPI = {
       throw error;
     }
   },
+  // ajoute/replace cette fonction
+getAllLite: async (): Promise<Array<{ id: number; libelle?: string; name?: string; designation?: string; code?: string }>> => {
+  const res = await categorieEmployesAPI.getAll({ page: 0, size: 1000 });
+  const content = (res as any)?.content;
+  if (Array.isArray(content)) return content;
+  if (Array.isArray((res as any)?.data?.content)) return (res as any).data.content;
+  if (Array.isArray(res)) return res as any[];
+  return [];
+},
+
 
   // Obtenir une catégorie par ID
   getById: async (id: number): Promise<CategorieEmployesDTO> => {

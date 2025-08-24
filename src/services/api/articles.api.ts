@@ -48,6 +48,18 @@ export const articlesAPI = {
       throw error;
     }
   },
+  // ajoute/replace cette fonction
+getAllLite: async (): Promise<Array<{ id: number; libelle?: string; name?: string; designation?: string; code?: string }>> => {
+  const page = await articlesAPI.getAllArticles({ page: 0, size: 1000 });
+  // page peut être { content: [...] } ou autre
+  const content = (page as any)?.content;
+  if (Array.isArray(content)) return content;
+  // autres shapes possibles
+  if (Array.isArray((page as any)?.data?.content)) return (page as any).data.content;
+  if (Array.isArray(page)) return page as any[];
+  return [];
+},
+
 
   // Obtenir un article par nom
   getArticleByName: async (name: string): Promise<ArticleDTO> => {

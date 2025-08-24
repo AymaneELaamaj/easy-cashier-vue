@@ -9,6 +9,9 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useSubventions } from "@/hooks/useSubventions";
 import { SubventionDTO } from "@/types/entities";
 import { Search, Plus, Percent, Clock, DollarSign } from "lucide-react";
+import { CreateSubventionModal } from "@/components/subventions/CreateSubventionModal";
+import { EditSubventionModal } from "@/components/subventions/EditSubventionModal";
+import { DeleteSubventionModal } from "@/components/subventions/DeleteSubventionModal";
 
 export default function Subventions() {
   const [search, setSearch] = useState("");
@@ -19,12 +22,7 @@ export default function Subventions() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  const {
-    data: subventionsPage,
-    isLoading,
-    error,
-  } = useSubventions({ page, size: pageSize });
-
+  const { data: subventionsPage, isLoading, error } = useSubventions({ page, size: pageSize });
   const subventions = subventionsPage?.content ?? [];
 
   const filteredSubventions = useMemo(() => {
@@ -210,7 +208,10 @@ export default function Subventions() {
         </CardContent>
       </Card>
 
-      {/* TODO: Create/Edit/Delete modals */}
+      {/* Modals */}
+      <CreateSubventionModal open={showCreateModal} onClose={() => setShowCreateModal(false)} />
+      <EditSubventionModal open={showEditModal} onClose={() => setShowEditModal(false)} subvention={selectedSubvention} />
+      <DeleteSubventionModal open={showDeleteModal} onClose={() => setShowDeleteModal(false)} subvention={selectedSubvention} />
     </div>
   );
 }
