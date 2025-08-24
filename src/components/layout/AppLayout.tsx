@@ -8,15 +8,25 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   return (
-    <div className="min-h-screen flex w-full bg-background">
-      <AppSidebar />
+    <div className="h-screen flex w-full bg-background overflow-hidden">
+      {/* Sidebar FIXE avec position fixed */}
+      <div className="fixed left-0 top-0 h-full z-10">
+        <AppSidebar />
+      </div>
       
-      <div className="flex-1 flex flex-col">
-        <AppHeader />
+      {/* Contenu principal avec margin pour compenser la sidebar */}
+      <div className="flex-1 flex flex-col min-w-0 ml-60">
+        {/* Header fixe */}
+        <div className="flex-shrink-0 sticky top-0 z-5 bg-background border-b">
+          <AppHeader />
+        </div>
         
-        <main className="flex-1 overflow-auto">
-          <div className="container mx-auto p-6">
-            {children}
+        {/* Zone de contenu scrollable */}
+        <main className="flex-1 overflow-y-auto bg-muted/30">
+          <div className="p-4">
+            <div className="max-w-full">
+              {children}
+            </div>
           </div>
         </main>
       </div>

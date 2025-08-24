@@ -5,37 +5,73 @@ import { CategorieEmployesDTO } from '@/types/entities';
 export const categorieEmployesAPI = {
   // Lister toutes les catégories d'employés (avec pagination)
   getAll: async (pageable?: Pageable): Promise<Page<CategorieEmployesDTO>> => {
-    const params = new URLSearchParams();
-    if (pageable?.page !== undefined) params.append('page', pageable.page.toString());
-    if (pageable?.size !== undefined) params.append('size', pageable.size.toString());
-    if (pageable?.sort) params.append('sort', pageable.sort);
+    try {
+      const params = new URLSearchParams();
+      if (pageable?.page !== undefined) params.append('page', pageable.page.toString());
+      if (pageable?.size !== undefined) params.append('size', pageable.size.toString());
+      if (pageable?.sort) params.append('sort', pageable.sort);
 
-    const qs = params.toString();
-    const response = await api.get(`/categories-employes/all${qs ? `?${qs}` : ''}`);
-    return response.data.data || response.data;
+      const qs = params.toString();
+      const url = `/categories-employes/all${qs ? `?${qs}` : ''}`;
+      console.log('🌐 Appel API Categories Employés:', url);
+      
+      const response = await api.get(url);
+      console.log('📡 Réponse API Categories:', response.data);
+      
+      // Adapter selon la structure de votre réponse
+      if (response.data.page) {
+        return response.data.page;
+      }
+      return response.data.data || response.data;
+      
+    } catch (error) {
+      console.error('❌ Erreur dans getAll categories:', error);
+      throw error;
+    }
   },
 
   // Obtenir une catégorie par ID
   getById: async (id: number): Promise<CategorieEmployesDTO> => {
+    console.log('🔍 Récupération catégorie ID:', id);
     const response = await api.get(`/categories-employes/${id}`);
+    console.log('✅ Catégorie trouvée:', response.data);
     return response.data.data || response.data;
   },
 
   // Créer une nouvelle catégorie d'employé
   create: async (cadre: string): Promise<CategorieEmployesDTO> => {
-    const response = await api.post('/categories-employes/create', { cadre });
-    return response.data.data || response.data;
+    console.log('🆕 Création catégorie avec cadre:', cadre);
+    
+    // Selon votre backend, il faut peut-être envoyer en query param
+    // Essayons d'abord en body, puis en query param si ça ne marche pas
+    try {
+      const response = await api.post('/categories-employes/create', { cadre });
+      console.log('✅ Catégorie créée (body):', response.data);
+      return response.data.data || response.data;
+    } catch (error) {
+      console.log('⚠️ Échec création en body, essai en query param...');
+      // Fallback: essayer en query parameter
+      const response = await api.post(`/categories-employes/create?cadre=${encodeURIComponent(cadre)}`);
+      console.log('✅ Catégorie créée (query):', response.data);
+      return response.data.data || response.data;
+    }
   },
 
   // Mettre à jour une catégorie d'employé
   update: async (id: number, cadre: string): Promise<CategorieEmployesDTO> => {
-    const response = await api.put(`/categories-employes/update/${id}`, { cadre });
+    console.log('📝 Mise à jour catégorie ID:', id, 'avec cadre:', cadre);
+    
+    // ✅ CORRECTION: Envoyer le paramètre 'cadre' en query parameter au lieu du body
+    const response = await api.patch(`/categories-employes/${id}?cadre=${encodeURIComponent(cadre)}`);
+    console.log('✅ Catégorie mise à jour:', response.data);
     return response.data.data || response.data;
   },
 
   // Supprimer une catégorie d'employé
   delete: async (id: number): Promise<void> => {
+    console.log('🗑️ Suppression catégorie ID:', id);
     await api.delete(`/categories-employes/${id}`);
+    console.log('✅ Catégorie supprimée');
   }
 };
 

@@ -11,13 +11,42 @@ export const articlesAPI = {
 
   // Lister tous les articles (avec pagination)
   getAllArticles: async (pageable?: Pageable): Promise<Page<ArticleDTO>> => {
-    const params = new URLSearchParams();
-    if (pageable?.page !== undefined) params.append('page', pageable.page.toString());
-    if (pageable?.size !== undefined) params.append('size', pageable.size.toString());
-    if (pageable?.sort) params.append('sort', pageable.sort);
+    try {
+      const params = new URLSearchParams();
+      if (pageable?.page !== undefined) params.append('page', pageable.page.toString());
+      if (pageable?.size !== undefined) params.append('size', pageable.size.toString());
+      if (pageable?.sort) params.append('sort', pageable.sort);
 
-    const response = await api.get<ApiResponse<Page<ArticleDTO>>>(`/articles/products?${params}`);
-    return response.data.data;
+      const url = `/articles/products?${params}`;
+      console.log('🌐 Appel API:', url);
+      
+      const response = await api.get<any>(url); // Changé le type générique
+      console.log('📡 Réponse API brute:', response);
+      console.log('📡 Response.data:', response.data);
+      console.log('📡 Response.data.page:', response.data.page); // Log de la bonne propriété
+      
+      // ✅ CORRECTION: Utiliser response.data.page au lieu de response.data.data
+      if (response.data && response.data.page) {
+        console.log('✅ Données valides trouvées dans page:', response.data.page);
+        return response.data.page; // ← Changement ici
+      }
+      
+      console.log('⚠️ Pas de données valides, retour page vide');
+      // Retourner une page vide si pas de données
+      return {
+        content: [],
+        totalElements: 0,
+        totalPages: 0,
+        size: pageable?.size || 10,
+        number: pageable?.page || 0,
+        first: true,
+        last: true,
+        empty: true
+      };
+    } catch (error) {
+      console.error('❌ Erreur dans getAllArticles:', error);
+      throw error;
+    }
   },
 
   // Obtenir un article par nom

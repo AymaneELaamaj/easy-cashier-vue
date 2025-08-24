@@ -1,19 +1,17 @@
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { DataTable } from '@/components/ui/DataTable';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { useSubventions } from '@/hooks/useSubventions';
-import { SubventionDTO } from '@/types/entities';
-import { Search, Plus, Percent, Clock, Calendar, DollarSign } from 'lucide-react';
-// import { CreateSubventionModal } from '@/components/subventions/CreateSubventionModal';
-// import { EditSubventionModal } from '@/components/subventions/EditSubventionModal';
-// import { DeleteSubventionModal } from '@/components/subventions/DeleteSubventionModal';
+// pages/Subventions.tsx
+import { useState, useMemo } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { DataTable } from "@/components/ui/DataTable";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { useSubventions } from "@/hooks/useSubventions";
+import { SubventionDTO } from "@/types/entities";
+import { Search, Plus, Percent, Clock, DollarSign } from "lucide-react";
 
-export function Subventions() {
-  const [search, setSearch] = useState('');
+export default function Subventions() {
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [selectedSubvention, setSelectedSubvention] = useState<SubventionDTO | null>(null);
@@ -22,123 +20,84 @@ export function Subventions() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const {
-    data: subventions,
+    data: subventionsPage,
     isLoading,
     error,
-    createSubvention,
-    updateSubvention,
-    deleteSubvention,
-    isCreating,
-    isUpdating,
-    isDeleting
   } = useSubventions({ page, size: pageSize });
 
-  const handleEdit = (subvention: SubventionDTO) => {
-    setSelectedSubvention(subvention);
-    setShowEditModal(true);
-  };
+  const subventions = subventionsPage?.content ?? [];
 
-  const handleDelete = (subvention: SubventionDTO) => {
-    setSelectedSubvention(subvention);
-    setShowDeleteModal(true);
-  };
+  const filteredSubventions = useMemo(() => {
+    const q = (search ?? "").trim();
+    if (!q) return subventions;
+    return subventions.filter((s) =>
+      [s.taux, s.articleId, s.categorieEmployesId]
+        .map((v) => (v ?? "").toString())
+        .some((txt) => txt.includes(q))
+    );
+  }, [search, subventions]);
 
-  const filteredSubventions = subventions?.content?.filter(subvention =>
-    subvention.taux?.toString().includes(search) ||
-    subvention.articleId?.toString().includes(search) ||
-    subvention.categorieEmployesId?.toString().includes(search)
-  ) || [];
-
-  const getStatusColor = (actif: boolean) => {
-    return actif ? 'default' : 'secondary';
-  };
+  const getStatusColor = (actif: boolean) => (actif ? "default" : "secondary");
 
   const columns = [
     {
-      key: 'articleId',
-      header: 'Article ID',
-      render: (value: any, subvention: SubventionDTO) => (
-        <div className="font-medium">#{subvention.articleId}</div>
-      ),
+      key: "articleId",
+      header: "Article ID",
+      render: (_: any, s: SubventionDTO) => <div className="font-medium">#{s.articleId}</div>,
     },
     {
-      key: 'categorieEmployesId',
-      header: 'Catégorie Employés',
-      render: (value: any, subvention: SubventionDTO) => (
-        <div className="text-sm">#{subvention.categorieEmployesId}</div>
-      ),
+      key: "categorieEmployesId",
+      header: "Catégorie Employés",
+      render: (_: any, s: SubventionDTO) => <div className="text-sm">#{s.categorieEmployesId}</div>,
     },
     {
-      key: 'taux',
-      header: 'Taux',
-      render: (value: any, subvention: SubventionDTO) => (
-        <div className="font-medium text-success">
-          {subvention.taux}%
-        </div>
-      ),
+      key: "taux",
+      header: "Taux",
+      render: (_: any, s: SubventionDTO) => <div className="font-medium text-success">{s.taux}%</div>,
     },
     {
-      key: 'plafondJour',
-      header: 'Plafond Jour',
-      render: (value: any, subvention: SubventionDTO) => (
+      key: "plafondJour",
+      header: "Plafond Jour",
+      render: (_: any, s: SubventionDTO) => (
         <div className="text-sm">
-          {subvention.plafondJour.toLocaleString('fr-FR', { 
-            style: 'currency', 
-            currency: 'MAD' 
-          })}
+          {(s.plafondJour ?? 0).toLocaleString("fr-FR", { style: "currency", currency: "MAD" })}
         </div>
       ),
     },
     {
-      key: 'plafondSemaine',
-      header: 'Plafond Semaine',
-      render: (value: any, subvention: SubventionDTO) => (
+      key: "plafondSemaine",
+      header: "Plafond Semaine",
+      render: (_: any, s: SubventionDTO) => (
         <div className="text-sm">
-          {subvention.plafondSemaine.toLocaleString('fr-FR', { 
-            style: 'currency', 
-            currency: 'MAD' 
-          })}
+          {(s.plafondSemaine ?? 0).toLocaleString("fr-FR", { style: "currency", currency: "MAD" })}
         </div>
       ),
     },
     {
-      key: 'plafondMois',
-      header: 'Plafond Mois',
-      render: (value: any, subvention: SubventionDTO) => (
+      key: "plafondMois",
+      header: "Plafond Mois",
+      render: (_: any, s: SubventionDTO) => (
         <div className="text-sm">
-          {subvention.plafondMois.toLocaleString('fr-FR', { 
-            style: 'currency', 
-            currency: 'MAD' 
-          })}
+          {(s.plafondMois ?? 0).toLocaleString("fr-FR", { style: "currency", currency: "MAD" })}
         </div>
       ),
     },
     {
-      key: 'actif',
-      header: 'Statut',
-      render: (value: any, subvention: SubventionDTO) => (
-        <Badge variant={getStatusColor(subvention.actif)}>
-          {subvention.actif ? 'Actif' : 'Inactif'}
-        </Badge>
+      key: "actif",
+      header: "Statut",
+      render: (_: any, s: SubventionDTO) => (
+        <Badge variant={getStatusColor(!!s.actif)}>{s.actif ? "Actif" : "Inactif"}</Badge>
       ),
     },
     {
-      key: 'actions',
-      header: 'Actions',
-      render: (value: any, subvention: SubventionDTO) => (
+      key: "actions",
+      header: "Actions",
+      render: (_: any, s: SubventionDTO) => (
         <div className="flex space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleEdit(subvention)}
-          >
+          <Button variant="outline" size="sm" onClick={() => { setSelectedSubvention(s); setShowEditModal(true); }}>
             Modifier
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleDelete(subvention)}
-          >
+          <Button variant="outline" size="sm" onClick={() => { setSelectedSubvention(s); setShowDeleteModal(true); }}>
             Supprimer
           </Button>
         </div>
@@ -146,11 +105,12 @@ export function Subventions() {
     },
   ];
 
-  const moyenneTaux = filteredSubventions.length > 0 
-    ? filteredSubventions.reduce((sum, s) => sum + s.taux, 0) / filteredSubventions.length 
-    : 0;
+  const moyenneTaux =
+    filteredSubventions.length > 0
+      ? filteredSubventions.reduce((sum, s) => sum + (s.taux ?? 0), 0) / filteredSubventions.length
+      : 0;
 
-  const totalPlafondMois = filteredSubventions.reduce((sum, s) => sum + s.plafondMois, 0);
+  const totalPlafondMois = filteredSubventions.reduce((sum, s) => sum + (s.plafondMois ?? 0), 0);
 
   if (isLoading) return <LoadingSpinner />;
   if (error) return <div>Erreur: {error.message}</div>;
@@ -160,9 +120,7 @@ export function Subventions() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Subventions</h1>
-          <p className="text-muted-foreground">
-            Gérez les subventions et plafonds de votre système.
-          </p>
+          <p className="text-muted-foreground">Gérez les subventions et plafonds de votre système.</p>
         </div>
         <Button onClick={() => setShowCreateModal(true)}>
           <Plus className="h-4 w-4 mr-2" />
@@ -178,7 +136,7 @@ export function Subventions() {
             <Percent className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{subventions?.totalElements || 0}</div>
+            <div className="text-2xl font-bold">{subventionsPage?.totalElements ?? 0}</div>
           </CardContent>
         </Card>
 
@@ -189,7 +147,7 @@ export function Subventions() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-success">
-              {filteredSubventions.filter(s => s.actif).length}
+              {filteredSubventions.filter((s) => !!s.actif).length}
             </div>
           </CardContent>
         </Card>
@@ -200,9 +158,7 @@ export function Subventions() {
             <Percent className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {moyenneTaux.toFixed(1)}%
-            </div>
+            <div className="text-2xl font-bold">{moyenneTaux.toFixed(1)}%</div>
           </CardContent>
         </Card>
 
@@ -213,7 +169,7 @@ export function Subventions() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {totalPlafondMois.toLocaleString('fr-FR', { style: 'currency', currency: 'MAD' })}
+              {totalPlafondMois.toLocaleString("fr-FR", { style: "currency", currency: "MAD" })}
             </div>
           </CardContent>
         </Card>
@@ -236,18 +192,16 @@ export function Subventions() {
       <Card>
         <CardHeader>
           <CardTitle>Liste des Subventions</CardTitle>
-          <CardDescription>
-            Gérez toutes vos subventions et leurs plafonds.
-          </CardDescription>
+          <CardDescription>Gérez toutes vos subventions et leurs plafonds.</CardDescription>
         </CardHeader>
         <CardContent>
           <DataTable
             columns={columns}
             data={filteredSubventions}
             pagination={{
-              page: page,
+              page,
               size: pageSize,
-              total: subventions?.totalElements || 0,
+              total: subventionsPage?.totalElements ?? 0,
               onPageChange: setPage,
               onSizeChange: setPageSize,
             }}
@@ -256,7 +210,7 @@ export function Subventions() {
         </CardContent>
       </Card>
 
-      {/* Modals - TODO: Implement modals */}
+      {/* TODO: Create/Edit/Delete modals */}
     </div>
   );
 }

@@ -34,7 +34,7 @@ const getRoleColor = (role: string) => {
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('fr-FR', { 
     style: 'currency', 
-    currency: 'EUR' 
+    currency: 'MAD' 
   }).format(amount);
 };
 
@@ -64,19 +64,16 @@ export function Users() {
     isDeleting,
     isChargingBalance,
     isInitializingBalance,
-    isChangingCategory
+    isChangingCategory,
+    refetch
   } = useUsers({ page, size: pageSize });
 
-  console.log('Users page data:', { users, isLoading, error });
-
-  // Debug logs
-  console.log('🔧 Users page state:', {
-    users,
-    isLoading,
-    error,
-    page,
-    pageSize
-  });
+  // Debug logs améliorés
+  console.log('🔍 Users data:', users);
+  console.log('🔍 Users type:', typeof users);
+  console.log('🔍 Users content:', users?.content);
+  console.log('🔍 Is loading:', isLoading);
+  console.log('🔍 Error:', error);
 
   const handleEdit = (user: UtilisateurDTO) => {
     setSelectedUser(user);
@@ -199,18 +196,27 @@ export function Users() {
     },
   ];
 
-  const usersArray = Array.isArray(users) ? users : users?.content || [];
-  const filteredUsers = usersArray.filter((user: any) =>
+  // Gestion sécurisée des utilisateurs avec fallback
+  const usersContent = users?.content || [];
+  
+  const filteredUsers = usersContent.filter((user: any) =>
     user.prenom?.toLowerCase().includes(search.toLowerCase()) ||
     user.nom?.toLowerCase().includes(search.toLowerCase()) ||
     user.email?.toLowerCase().includes(search.toLowerCase())
   );
 
+  if (isLoading) return <LoadingSpinner />;
+
   if (error) {
     return (
-      <div className="text-center py-8">
-        <p className="text-destructive">Erreur lors du chargement des utilisateurs</p>
-        <Button onClick={() => window.location.reload()} className="mt-4">
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <div className="text-destructive text-lg font-semibold">
+          Erreur lors du chargement des utilisateurs
+        </div>
+        <div className="text-muted-foreground text-center max-w-md">
+          {error.message || 'Une erreur inattendue s\'est produite'}
+        </div>
+        <Button onClick={() => window.location.reload()}>
           Réessayer
         </Button>
       </div>
@@ -218,67 +224,78 @@ export function Users() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* En-tête */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Gestion des utilisateurs</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-bold tracking-tight">Gestion des utilisateurs</h1>
+          <p className="text-sm text-muted-foreground">
             Gérez les utilisateurs, leurs rôles et leurs soldes
           </p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nouvel utilisateur
-        </Button>
+        <div className="flex space-x-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => refetch && refetch()}
+            disabled={isLoading}
+          >
+            <Search className="h-4 w-4 mr-2" />
+            {isLoading ? 'Chargement...' : 'Recharger'}
+          </Button>
+          <Button size="sm" onClick={() => setShowCreateModal(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nouvel utilisateur
+          </Button>
+        </div>
       </div>
 
       {/* Statistiques */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total utilisateurs</CardTitle>
+      <div className="grid gap-3 grid-cols-4">
+        <Card className="py-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-3">
+            <CardTitle className="text-xs font-medium">Total utilisateurs</CardTitle>
             <UserPlus className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{users?.totalElements || 0}</div>
+          <CardContent className="pb-3">
+            <div className="text-xl font-bold">{users?.totalElements || 0}</div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Utilisateurs actifs</CardTitle>
+        <Card className="py-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-3">
+            <CardTitle className="text-xs font-medium">Utilisateurs actifs</CardTitle>
             <UserPlus className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {users?.content?.filter(u => u.isActive).length || 0}
+          <CardContent className="pb-3">
+            <div className="text-xl font-bold">
+              {usersContent.filter((u: any) => u.isActive).length || 0}
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Solde total</CardTitle>
+        <Card className="py-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-3">
+            <CardTitle className="text-xs font-medium">Solde total</CardTitle>
             <Wallet className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
+          <CardContent className="pb-3">
+            <div className="text-xl font-bold">
               {formatCurrency(
-                users?.content?.reduce((sum, u) => sum + (u.solde || 0), 0) || 0
+                usersContent.reduce((sum: number, u: any) => sum + (u.solde || 0), 0) || 0
               )}
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Administrateurs</CardTitle>
+        <Card className="py-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-3">
+            <CardTitle className="text-xs font-medium">Administrateurs</CardTitle>
             <UserPlus className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {users?.content?.filter(u => 
+          <CardContent className="pb-3">
+            <div className="text-xl font-bold">
+              {usersContent.filter((u: any) => 
                 u.role === UserRole.ADMIN || u.role === UserRole.SUPER_ADMIN
               ).length || 0}
             </div>
@@ -286,30 +303,43 @@ export function Users() {
         </Card>
       </div>
 
-      {/* Filtres et recherche */}
+      {/* Recherche */}
+      <div className="flex items-center">
+        <div className="relative w-80">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Rechercher par nom, prénom ou email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8 h-9"
+          />
+        </div>
+      </div>
+
+      {/* Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>Liste des utilisateurs</CardTitle>
-          <CardDescription>
-            Recherchez et gérez tous les utilisateurs du système
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center space-x-2 mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Rechercher par nom, prénom ou email..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-8"
-              />
+        <CardHeader className="pb-3">
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle className="text-lg">Liste des utilisateurs</CardTitle>
+              <CardDescription className="text-sm">
+                Recherchez et gérez tous les utilisateurs du système
+              </CardDescription>
             </div>
           </div>
-
-          {isLoading ? (
-            <div className="flex justify-center py-8">
-              <LoadingSpinner size="lg" />
+        </CardHeader>
+        <CardContent className="pb-4">
+          {usersContent.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <UserPlus className="h-16 w-16 text-muted-foreground" />
+              <div className="text-lg font-semibold">Aucun utilisateur trouvé</div>
+              <div className="text-muted-foreground text-center max-w-md">
+                Commencez par créer votre premier utilisateur en cliquant sur "Nouvel utilisateur"
+              </div>
+              <Button onClick={() => setShowCreateModal(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Créer le premier utilisateur
+              </Button>
             </div>
           ) : (
             <DataTable

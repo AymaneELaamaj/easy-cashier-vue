@@ -8,9 +8,9 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useArticles } from '@/hooks/useArticles';
 import { ArticleDTO } from '@/types/entities';
 import { Search, Plus, Package, ShoppingCart, DollarSign } from 'lucide-react';
-// import { CreateArticleModal } from '@/components/articles/CreateArticleModal';
-// import { EditArticleModal } from '@/components/articles/EditArticleModal';
-// import { DeleteArticleModal } from '@/components/articles/DeleteArticleModal';
+import { CreateArticleModal } from '@/components/articles/CreateArticleModal';
+import { EditArticleModal } from '@/components/articles/EditArticleModal';
+import { DeleteArticleModal } from '@/components/articles/DeleteArticleModal';
 
 export function Articles() {
   const [search, setSearch] = useState('');
@@ -30,7 +30,8 @@ export function Articles() {
     deleteArticle,
     isCreating,
     isUpdating,
-    isDeleting
+    isDeleting,
+    refetch
   } = useArticles({ page, size: pageSize });
 
   const handleEdit = (article: ArticleDTO) => {
@@ -43,10 +44,13 @@ export function Articles() {
     setShowDeleteModal(true);
   };
 
-  const filteredArticles = articles?.content?.filter(article =>
+  // Gestion sécurisée des articles avec fallback pour les données vides
+  const articlesContent = articles?.content || [];
+  
+  const filteredArticles = articlesContent.filter(article =>
     article.nom?.toLowerCase().includes(search.toLowerCase()) ||
     article.description?.toLowerCase().includes(search.toLowerCase())
-  ) || [];
+  );
 
   const getStatusColor = (status: boolean) => {
     return status ? 'default' : 'secondary';
@@ -123,11 +127,12 @@ export function Articles() {
       key: 'actions',
       header: 'Actions',
       render: (value: any, article: ArticleDTO) => (
-        <div className="flex space-x-2">
+        <div className="flex space-x-1">
           <Button
             variant="outline"
             size="sm"
             onClick={() => handleEdit(article)}
+            className="h-7 px-2 text-xs"
           >
             Modifier
           </Button>
@@ -135,6 +140,7 @@ export function Articles() {
             variant="outline"
             size="sm"
             onClick={() => handleDelete(article)}
+            className="h-7 px-2 text-xs"
           >
             Supprimer
           </Button>
@@ -144,54 +150,82 @@ export function Articles() {
   ];
 
   if (isLoading) return <LoadingSpinner />;
-  if (error) return <div>Erreur: {error.message}</div>;
+  
+  // Gestion des erreurs avec plus de détails
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full space-y-4">
+        <div className="text-destructive text-lg font-semibold">
+          Erreur lors du chargement des articles
+        </div>
+        <div className="text-muted-foreground text-center max-w-md">
+          {error.message || 'Une erreur inattendue s\'est produite'}
+        </div>
+        <Button onClick={() => window.location.reload()}>
+          Réessayer
+        </Button>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-4">
+      {/* Header compact */}
+      <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Articles</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-bold tracking-tight">Articles</h1>
+          <p className="text-sm text-muted-foreground">
             Gérez les articles et produits de votre système.
           </p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nouvel Article
-        </Button>
+        <div className="flex space-x-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isLoading}
+          >
+            <Search className="h-4 w-4 mr-2" />
+            {isLoading ? 'Chargement...' : 'Recharger'}
+          </Button>
+          <Button size="sm" onClick={() => setShowCreateModal(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nouvel Article
+          </Button>
+        </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Articles</CardTitle>
+      {/* KPI Cards - Plus compactes */}
+      <div className="grid gap-3 grid-cols-4">
+        <Card className="py-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-3">
+            <CardTitle className="text-xs font-medium">Total Articles</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{articles?.totalElements || 0}</div>
+          <CardContent className="pb-3">
+            <div className="text-xl font-bold">{articles?.totalElements || 0}</div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Disponibles</CardTitle>
+        <Card className="py-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-3">
+            <CardTitle className="text-xs font-medium">Disponibles</CardTitle>
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-success">
+          <CardContent className="pb-3">
+            <div className="text-xl font-bold text-success">
               {filteredArticles.filter(a => a.disponible).length}
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Valeur Stock</CardTitle>
+        <Card className="py-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-3">
+            <CardTitle className="text-xs font-medium">Valeur Stock</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
+          <CardContent className="pb-3">
+            <div className="text-xl font-bold">
               {filteredArticles.reduce((total, article) => 
                 total + (parseFloat(article.prix) * (article.quantite || 0)), 0
               ).toLocaleString('fr-FR', { style: 'currency', currency: 'MAD' })}
@@ -199,57 +233,91 @@ export function Articles() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Stock Total</CardTitle>
+        <Card className="py-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-3">
+            <CardTitle className="text-xs font-medium">Stock Total</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
+          <CardContent className="pb-3">
+            <div className="text-xl font-bold">
               {filteredArticles.reduce((total, article) => total + (article.quantite || 0), 0)}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Search */}
-      <div className="flex items-center space-x-2">
-        <div className="relative flex-1 max-w-sm">
+      {/* Search compact */}
+      <div className="flex items-center">
+        <div className="relative w-80">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Rechercher des articles..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-8"
+            className="pl-8 h-9"
           />
         </div>
       </div>
 
       {/* Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>Liste des Articles</CardTitle>
-          <CardDescription>
-            Gérez tous vos articles et leur disponibilité.
-          </CardDescription>
+        <CardHeader className="pb-3">
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle className="text-lg">Liste des Articles</CardTitle>
+              <CardDescription className="text-sm">
+                Gérez tous vos articles et leur disponibilité.
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
-          <DataTable
-            columns={columns}
-            data={filteredArticles}
-            pagination={{
-              page: page,
-              size: pageSize,
-              total: articles?.totalElements || 0,
-              onPageChange: setPage,
-              onSizeChange: setPageSize,
-            }}
-            searchable={false}
-          />
+        <CardContent className="pb-4">
+          {articlesContent.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <Package className="h-16 w-16 text-muted-foreground" />
+              <div className="text-lg font-semibold">Aucun article trouvé</div>
+              <div className="text-muted-foreground text-center max-w-md">
+                Commencez par créer votre premier article en cliquant sur "Nouvel Article"
+              </div>
+              <Button onClick={() => setShowCreateModal(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Créer le premier article
+              </Button>
+            </div>
+          ) : (
+            <DataTable
+              columns={columns}
+              data={filteredArticles}
+              pagination={{
+                page: page,
+                size: pageSize,
+                total: articles?.totalElements || 0,
+                onPageChange: setPage,
+                onSizeChange: setPageSize,
+              }}
+              searchable={false}
+            />
+          )}
         </CardContent>
       </Card>
 
-      {/* Modals - TODO: Implement modals */}
+      {/* Modals */}
+      <CreateArticleModal 
+        open={showCreateModal} 
+        onOpenChange={setShowCreateModal} 
+      />
+      
+      <EditArticleModal 
+        open={showEditModal} 
+        onOpenChange={setShowEditModal} 
+        article={selectedArticle} 
+      />
+      
+      <DeleteArticleModal 
+        open={showDeleteModal} 
+        onOpenChange={setShowDeleteModal} 
+        article={selectedArticle} 
+      />
     </div>
   );
 }

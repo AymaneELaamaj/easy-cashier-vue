@@ -128,13 +128,13 @@ export interface RegisterRequest {
   nom: string;
   prenom: string;
   email: string;
-  password: string;
-  role?: string;
-  cin: string;
+  password?: string;
+  cin?: string;
   telephone?: string;
-  solde?: number;
+  role: 'SUPER_ADMIN' | 'ADMIN' | 'CAISSIER' | 'EMPLOYE';
   isActive?: boolean;
-  categorieEmployesId?: number;
+  solde?: number;
+  categorieEmployeId?: number;
 }
 
 export interface ConfigPaiementRequest {

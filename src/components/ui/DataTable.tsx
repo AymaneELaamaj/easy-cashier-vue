@@ -75,19 +75,22 @@ export function DataTable<T extends Record<string, any>>({
   };
 
   const LoadingRow = () => (
-    <TableRow>
+    <TableRow className="hover:bg-transparent">
       {columns.map((column, index) => (
         <TableCell key={index}>
-          <div className="shimmer h-4 w-full rounded" />
+          <div className="animate-pulse bg-muted h-4 w-full rounded" />
         </TableCell>
       ))}
     </TableRow>
   );
 
   const EmptyRow = () => (
-    <TableRow>
-      <TableCell colSpan={columns.length} className="text-center py-8 text-muted-foreground">
-        Aucune donnée disponible
+    <TableRow className="hover:bg-transparent">
+      <TableCell colSpan={columns.length} className="text-center py-12 text-muted-foreground">
+        <div className="flex flex-col items-center space-y-2">
+          <div className="text-lg font-medium">Aucune donnée disponible</div>
+          <div className="text-sm">Aucun résultat ne correspond à votre recherche</div>
+        </div>
       </TableCell>
     </TableRow>
   );
@@ -97,16 +100,16 @@ export function DataTable<T extends Record<string, any>>({
       {/* Barre de recherche et filtres */}
       {searchable && (
         <div className="flex items-center space-x-2">
-          <div className="relative flex-1">
+          <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Rechercher..."
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
-              className="pl-10"
+              className="pl-10 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="hover:bg-muted">
             <Filter className="h-4 w-4 mr-2" />
             Filtres
           </Button>
@@ -114,23 +117,25 @@ export function DataTable<T extends Record<string, any>>({
       )}
 
       {/* Table */}
-      <div className="rounded-md border">
+      <div className="rounded-lg border bg-card">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="hover:bg-transparent border-b bg-muted/50">
               {columns.map((column) => (
                 <TableHead
                   key={column.key}
                   className={cn(
+                    'font-semibold text-foreground',
                     column.className,
-                    column.sortable && sortable && 'cursor-pointer hover:bg-muted/50'
+                    column.sortable && sortable && 
+                    'cursor-pointer select-none transition-colors hover:bg-muted/70 active:bg-muted'
                   )}
                   onClick={() => column.sortable && handleSort(column.key)}
                 >
                   <div className="flex items-center space-x-1">
                     <span>{column.header}</span>
                     {column.sortable && sortable && sortColumn === column.key && (
-                      <span className="text-xs">
+                      <span className="text-xs font-bold text-blue-600">
                         {sortDirection === 'asc' ? '↑' : '↓'}
                       </span>
                     )}
@@ -148,12 +153,26 @@ export function DataTable<T extends Record<string, any>>({
               <EmptyRow />
             ) : (
               data.map((row, index) => (
-                <TableRow key={index} className="table-row">
+                <TableRow 
+                  key={index} 
+                  className={cn(
+                    "transition-colors border-b last:border-b-0",
+                    "hover:bg-muted/30 hover:shadow-sm",
+                    "focus-within:bg-muted/50 focus-within:shadow-md",
+                    index % 2 === 0 ? "bg-background" : "bg-muted/10"
+                  )}
+                >
                   {columns.map((column) => (
-                    <TableCell key={column.key} className={column.className}>
+                    <TableCell 
+                      key={column.key} 
+                      className={cn(
+                        "py-3 px-4 transition-colors",
+                        column.className
+                      )}
+                    >
                       {column.render 
                         ? column.render(row[column.key], row)
-                        : row[column.key]
+                        : row[column.key] || '-'
                       }
                     </TableCell>
                   ))}
@@ -166,19 +185,20 @@ export function DataTable<T extends Record<string, any>>({
 
       {/* Pagination */}
       {pagination && (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between px-2 py-4 bg-card rounded-lg border">
           <div className="flex items-center space-x-2">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground font-medium">
               Lignes par page:
             </p>
             <Select
               value={pagination.size.toString()}
               onValueChange={(value) => pagination.onSizeChange(Number(value))}
             >
-              <SelectTrigger className="w-[70px]">
+              <SelectTrigger className="w-[80px] h-8">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="5">5</SelectItem>
                 <SelectItem value="10">10</SelectItem>
                 <SelectItem value="20">20</SelectItem>
                 <SelectItem value="50">50</SelectItem>
@@ -187,9 +207,9 @@ export function DataTable<T extends Record<string, any>>({
             </Select>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <p className="text-sm text-muted-foreground">
-              Page {pagination.page + 1} sur {Math.ceil(pagination.total / pagination.size)}
+          <div className="flex items-center space-x-4">
+            <p className="text-sm text-muted-foreground font-medium">
+              Page {pagination.page + 1} sur {Math.ceil(pagination.total / pagination.size) || 1}
             </p>
             <div className="flex items-center space-x-1">
               <Button
@@ -197,16 +217,20 @@ export function DataTable<T extends Record<string, any>>({
                 size="sm"
                 onClick={() => pagination.onPageChange(pagination.page - 1)}
                 disabled={pagination.page === 0}
+                className="h-8 w-8 p-0 hover:bg-muted disabled:opacity-50"
               >
                 <ChevronLeft className="h-4 w-4" />
+                <span className="sr-only">Page précédente</span>
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => pagination.onPageChange(pagination.page + 1)}
                 disabled={pagination.page >= Math.ceil(pagination.total / pagination.size) - 1}
+                className="h-8 w-8 p-0 hover:bg-muted disabled:opacity-50"
               >
                 <ChevronRight className="h-4 w-4" />
+                <span className="sr-only">Page suivante</span>
               </Button>
             </div>
           </div>

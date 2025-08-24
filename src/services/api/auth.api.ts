@@ -28,18 +28,38 @@ export const authAPI = {
     return data;
   },
 
-  // Déconnexion
+  // Déconnexion améliorée
   logout: async (): Promise<void> => {
     try {
-      // Optionnel: appel API pour invalider le token côté serveur
-      await api.post('/auth/logout');
+      // Optionnel: Si vous ajoutez un endpoint logout côté serveur plus tard
+      // await api.post('/auth/logout');
+      
+      console.log('🚪 Déconnexion en cours...');
     } catch (error) {
-      // Ignorer les erreurs de logout côté serveur
-      console.warn('Erreur lors du logout côté serveur:', error);
+      // Ignorer les erreurs de logout côté serveur pour l'instant
+      console.warn('⚠️ Pas d\'endpoint logout côté serveur (normal):', error);
     } finally {
       // Toujours nettoyer les tokens locaux
+      console.log('🧹 Nettoyage des tokens locaux...');
       tokenManager.clearTokens();
+      
+      // Nettoyer d'autres données locales si nécessaire
+      localStorage.removeItem('user');
+      sessionStorage.clear();
+      
+      console.log('✅ Déconnexion terminée');
     }
+  },
+
+  // Déconnexion forcée (pour les cas d'erreur ou token expiré)
+  forceLogout: (): void => {
+    console.log('🚨 Déconnexion forcée (token invalide/expiré)');
+    tokenManager.clearTokens();
+    localStorage.removeItem('user');
+    sessionStorage.clear();
+    
+    // Rediriger vers la page de login
+    window.location.href = '/login';
   },
 
   // Vérification du token (optionnel)
@@ -52,6 +72,30 @@ export const authAPI = {
   refreshToken: async (refreshToken: string): Promise<{ accessToken: string }> => {
     const response = await api.post('/auth/refresh', { refreshToken });
     return response.data;
+  },
+
+  // Vérifier si l'utilisateur est connecté
+  isAuthenticated: (): boolean => {
+    const token = tokenManager.getAccessToken();
+    if (!token) return false;
+    
+    try {
+      // Vérifier si le token n'est pas expiré (optionnel)
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const now = Date.now() / 1000;
+      
+      if (payload.exp && payload.exp < now) {
+        console.log('🕐 Token expiré, déconnexion automatique');
+        authAPI.forceLogout();
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.warn('⚠️ Token invalide:', error);
+      authAPI.forceLogout();
+      return false;
+    }
   }
 };
 

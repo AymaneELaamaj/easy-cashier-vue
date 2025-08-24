@@ -101,12 +101,21 @@ const menuItems = [
 
 export function AppSidebar() {
   const location = useLocation();
-  const { hasAnyRole } = useAuthContext();
+  const { hasAnyRole, isLoadingUser, userError } = useAuthContext();
   
   const currentPath = location.pathname;
 
   // Filtrer les éléments du menu selon les rôles
-  const filteredMenuItems = menuItems.filter(item => hasAnyRole(item.roles));
+  // En mode développement, afficher tous les éléments si l'utilisateur n'est pas chargé
+  const filteredMenuItems = menuItems.filter(item => {
+    try {
+      return hasAnyRole(item.roles);
+    } catch (error) {
+      console.warn('Erreur lors de la vérification des rôles:', error);
+      // En mode développement, afficher tous les éléments
+      return process.env.NODE_ENV === 'development';
+    }
+  });
 
   const isActive = (path: string) => currentPath === path;
 
@@ -119,9 +128,9 @@ export function AppSidebar() {
     );
 
   return (
-    <div className="w-60 border-r border-border/50 bg-sidebar h-full flex flex-col">
+    <div className="w-60 border-r border-border/50 bg-sidebar h-screen flex flex-col">
       {/* Logo */}
-      <div className="flex items-center p-4 border-b border-border/50">
+      <div className="flex items-center p-4 border-b border-border/50 flex-shrink-0">
         <div className="flex items-center space-x-2">
           <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-sm">EP</span>
@@ -130,8 +139,8 @@ export function AppSidebar() {
         </div>
       </div>
 
-      {/* Navigation */}
-      <div className="flex-1 px-3 py-4">
+      {/* Navigation scrollable */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
         <div className="space-y-1">
           <p className="text-xs font-medium text-muted-foreground mb-2 px-3">
             Navigation
