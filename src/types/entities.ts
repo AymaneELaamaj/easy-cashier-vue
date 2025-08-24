@@ -75,18 +75,34 @@ export interface SubventionDTO {
   id?: number;
   taux: number;
   articleId: number;
+  articleNom?: string;
   plafondJour: number;
   plafondSemaine: number;
   plafondMois: number;
   actif: boolean;
   categorieEmployesId: number;
+  cadre?: string;
 }
 
 export interface RemboursementDTO {
   id?: number;
-  montant: number;
-  motif: string;
+  montantRemboursement: number;
+  dateCreation?: string;
+  dateTraitement?: string;
+  message: string;
+  status: StatusRemboursement;
+  transactionId: number;
+  numeroTicket?: string;
+  utilisateurId: number;
   utilisateur?: UtilisateurDTO;
+  commentaireAdmin?: string;
+  montant?: number; // Alias pour compatibilité
+}
+
+export enum StatusRemboursement {
+  EN_ATTENTE = 'EN_ATTENTE',
+  ACCEPTE = 'ACCEPTE',
+  REFUSE = 'REFUSE'
 }
 
 export interface RapportDTO {
@@ -95,7 +111,7 @@ export interface RapportDTO {
   description?: string;
   dateGeneration: string;
   periode: string;
-  donnees?: { [key: string]: any };
+  donnees?: { [key: string]: unknown };
   fichierPath?: string;
   taille?: number;
 }

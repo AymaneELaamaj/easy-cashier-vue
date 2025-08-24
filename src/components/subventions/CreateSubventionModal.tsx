@@ -13,7 +13,7 @@ export function CreateSubventionModal({
   const { createSubvention, isCreating } = useSubventions();
 
   const handleSubmit = async (values: SubventionFormValues) => {
-    await createSubvention(values as any);
+    await createSubvention(values as undefined);
     onClose();
   };
 

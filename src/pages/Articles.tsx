@@ -64,14 +64,14 @@ export function Articles() {
     {
       key: 'nom',
       header: 'Nom',
-      render: (value: any, article: ArticleDTO) => (
+      render: (value: unknown, article: ArticleDTO) => (
         <div className="font-medium">{article.nom}</div>
       ),
     },
     {
       key: 'prix',
       header: 'Prix',
-      render: (value: any, article: ArticleDTO) => (
+      render: (value: unknown, article: ArticleDTO) => (
         <div className="font-medium text-success">
           {parseFloat(article.prix).toLocaleString('fr-FR', { 
             style: 'currency', 
@@ -83,7 +83,7 @@ export function Articles() {
     {
       key: 'description',
       header: 'Description',
-      render: (value: any, article: ArticleDTO) => (
+      render: (value: unknown, article: ArticleDTO) => (
         <div className="text-sm text-muted-foreground max-w-xs truncate">
           {article.description || '-'}
         </div>
@@ -92,14 +92,14 @@ export function Articles() {
     {
       key: 'quantite',
       header: 'Quantité',
-      render: (value: any, article: ArticleDTO) => (
+      render: (value: unknown, article: ArticleDTO) => (
         <div className="text-center">{article.quantite || 0}</div>
       ),
     },
     {
       key: 'disponible',
       header: 'Disponibilité',
-      render: (value: any, article: ArticleDTO) => (
+      render: (value: unknown, article: ArticleDTO) => (
         <Badge variant={getAvailabilityColor(article.disponible)}>
           {article.disponible ? 'Disponible' : 'Indisponible'}
         </Badge>
@@ -108,7 +108,7 @@ export function Articles() {
     {
       key: 'status',
       header: 'Statut',
-      render: (value: any, article: ArticleDTO) => (
+      render: (value: unknown, article: ArticleDTO) => (
         <Badge variant={getStatusColor(article.status)}>
           {article.status ? 'Actif' : 'Inactif'}
         </Badge>
@@ -117,7 +117,7 @@ export function Articles() {
     {
       key: 'categorie',
       header: 'Catégorie',
-      render: (value: any, article: ArticleDTO) => (
+      render: (value: unknown, article: ArticleDTO) => (
         <div className="text-sm">
           {article.categorie?.libelle || '-'}
         </div>
@@ -126,10 +126,10 @@ export function Articles() {
     {
       key: 'actions',
       header: 'Actions',
-      render: (value: any, article: ArticleDTO) => (
+      render: (value: unknown, article: ArticleDTO) => (
         <div className="flex space-x-1">
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => handleEdit(article)}
             className="h-7 px-2 text-xs"
@@ -137,7 +137,7 @@ export function Articles() {
             Modifier
           </Button>
           <Button
-            variant="outline"
+            variant="destructive"
             size="sm"
             onClick={() => handleDelete(article)}
             className="h-7 px-2 text-xs"

@@ -49,7 +49,7 @@ export const articlesAPI = {
     }
   },
   // ajoute/replace cette fonction
-getAllLite: async (): Promise<Array<{ id: number; libelle?: string; name?: string; designation?: string; code?: string }>> => {
+getAllLite: async (): Promise<Array<{ id: number;  nom?: string }>> => {
   const page = await articlesAPI.getAllArticles({ page: 0, size: 1000 });
   // page peut être { content: [...] } ou autre
   const content = (page as any)?.content;

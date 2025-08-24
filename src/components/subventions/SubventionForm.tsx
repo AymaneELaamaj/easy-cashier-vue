@@ -108,7 +108,7 @@ export function SubventionForm({
             <SelectContent>
               {articleOptions.map((a) => (
                 <SelectItem key={a.id} value={String(a.id)}>
-                  {labelOf(a)} (#{a.id})
+                  {a.nom || labelOf(a)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -147,7 +147,7 @@ export function SubventionForm({
             <SelectContent>
               {categorieOptions.map((c) => (
                 <SelectItem key={c.id} value={String(c.id)}>
-                  {labelOf(c)} (#{c.id})
+                  {c.cadre}
                 </SelectItem>
               ))}
             </SelectContent>

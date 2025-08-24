@@ -51,7 +51,7 @@ export function EditArticleModal({ open, onOpenChange, article }: EditArticleMod
     }
   }, [article]);
 
-  const handleInputChange = (field: keyof ArticleDTO, value: any) => {
+  const handleInputChange = (field: keyof ArticleDTO, value: unknown) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -139,17 +139,7 @@ export function EditArticleModal({ open, onOpenChange, article }: EditArticleMod
                 placeholder="0"
               />
             </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="codeOdoo">Code Odoo</Label>
-              <Input
-                id="codeOdoo"
-                type="number"
-                value={formData.codeOdoo}
-                onChange={(e) => handleInputChange('codeOdoo', parseInt(e.target.value) || undefined)}
-                placeholder="Code Odoo"
-              />
-            </div>
+            {/* Champ Code Odoo supprimé de l'édition */}
           </div>
 
           <div className="flex items-center justify-between space-x-4">

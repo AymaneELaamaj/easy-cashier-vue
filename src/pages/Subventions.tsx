@@ -40,13 +40,13 @@ export default function Subventions() {
   const columns = [
     {
       key: "articleId",
-      header: "Article ID",
-      render: (_: any, s: SubventionDTO) => <div className="font-medium">#{s.articleId}</div>,
+      header: "Article",
+      render: (_: any, s: SubventionDTO) => <div className="font-medium">{s.articleNom }</div>,
     },
     {
       key: "categorieEmployesId",
       header: "Catégorie Employés",
-      render: (_: any, s: SubventionDTO) => <div className="text-sm">#{s.categorieEmployesId}</div>,
+      render: (_: any, s: SubventionDTO) => <div className="text-sm">{s.cadre}</div>,
     },
     {
       key: "taux",

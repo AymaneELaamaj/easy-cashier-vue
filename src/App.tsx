@@ -18,6 +18,7 @@ import { Articles } from "./pages/Articles";
 import { Badges } from "./pages/Badges";
 import { Transactions } from "./pages/Transactions";
 import Subventions from '@/pages/Subventions';
+import Remboursements from './pages/Remboursements';
 import { Categories } from "./pages/Categories";
 import { Configuration } from "./pages/Configuration";
 import Unauthorized from "./pages/Unauthorized";
@@ -99,10 +100,7 @@ const AppRoutes = () => (
     <Route path="/remboursements" element={
       <ProtectedRoute requiredRoles={['ADMIN', 'SUPER_ADMIN', 'EMPLOYE']}>
         <AppLayout>
-          <div className="text-center py-8">
-            <h1 className="text-2xl font-bold mb-4">Remboursements</h1>
-            <p className="text-muted-foreground">Page en cours de développement</p>
-          </div>
+          <Remboursements />
         </AppLayout>
       </ProtectedRoute>
     } />
