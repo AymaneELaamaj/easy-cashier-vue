@@ -119,7 +119,7 @@ export interface RapportDTO {
 export interface FeedbackDTO {
   id?: number;
   commentaire: string;
-  note?: number;
+  utilisateurid?: number;
   utilisateur?: UtilisateurDTO;
 }
 

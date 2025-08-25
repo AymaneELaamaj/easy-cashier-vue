@@ -34,6 +34,17 @@ export const feedbackAPI = {
     return response.data.data;
   },
 
+  // Obtenir mes feedbacks (utilisateur connecté)
+  getMyFeedbacks: async (pageable?: Pageable): Promise<Page<FeedbackDTO>> => {
+    const params = new URLSearchParams();
+    if (pageable?.page !== undefined) params.append('page', pageable.page.toString());
+    if (pageable?.size !== undefined) params.append('size', pageable.size.toString());
+    if (pageable?.sort) params.append('sort', pageable.sort);
+
+    const response = await api.get<ApiResponse<Page<FeedbackDTO>>>(`/feedbacks/my-feedbacks?${params}`);
+    return response.data.data;
+  },
+
   // Supprimer un feedback
   deleteFeedback: async (id: number): Promise<void> => {
     await api.delete<ApiResponse<void>>(`/feedbacks/delete?id=${id}`);
