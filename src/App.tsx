@@ -20,7 +20,6 @@ import { Transactions } from "./pages/Transactions";
 import Subventions from '@/pages/Subventions';
 import Remboursements from './pages/Remboursements';
 import Feedbacks from './pages/Feedbacks';
-import { Categories } from "./pages/Categories";
 import { Configuration } from "./pages/Configuration";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
@@ -66,13 +65,7 @@ const AppRoutes = () => (
       </ProtectedRoute>
     } />
 
-    <Route path="/categories" element={
-      <ProtectedRoute requiredRoles={['ADMIN', 'SUPER_ADMIN']}>
-        <AppLayout>
-          <Categories />
-        </AppLayout>
-      </ProtectedRoute>
-    } />
+   
 
     <Route path="/users" element={
       <ProtectedRoute requiredRoles={['ADMIN', 'SUPER_ADMIN']}>

@@ -12,7 +12,7 @@ export interface UtilisateurDTO {
   role: string;
   isActive: boolean;
   odooPartnerId?: number;
-  categorieEmployes?: CategorieEmployesDTO;
+  categorieEmployes?: CategorieEmployesResponse;
   badge?: BadgeDTO;
 }
 
@@ -36,7 +36,7 @@ export interface CategorieDTO {
   statut: boolean;
 }
 
-export interface CategorieEmployesDTO {
+export interface CategorieEmployesResponse {
   id?: number;
   cadre: string;
 }

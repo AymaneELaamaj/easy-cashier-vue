@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { DataTable } from '@/components/ui/DataTable';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useCategorieEmployes } from '@/hooks/useCategorieEmployes';
-import { CategorieEmployesDTO } from '@/types/entities';
+import { CategorieEmployesResponse } from '@/types/entities';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import CreateCategoryModal from '@/components/categories/CreateCategoryModal';
 import EditCategoryModal from '@/components/categories/EditCategoryModal';
@@ -16,7 +16,7 @@ export function CategorieEmployes() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
-  const [selectedCategory, setSelectedCategory] = useState<CategorieEmployesDTO | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<CategorieEmployesResponse | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -33,12 +33,12 @@ export function CategorieEmployes() {
     isDeleting
   } = useCategorieEmployes({ page, size: pageSize });
 
-  const handleEdit = (category: CategorieEmployesDTO) => {
+  const handleEdit = (category: CategorieEmployesResponse) => {
     setSelectedCategory(category);
     setShowEditModal(true);
   };
 
-  const handleDelete = (category: CategorieEmployesDTO) => {
+  const handleDelete = (category: CategorieEmployesResponse) => {
     setSelectedCategory(category);
     setShowDeleteModal(true);
   };
@@ -47,21 +47,21 @@ export function CategorieEmployes() {
     {
       key: 'id',
       header: 'ID',
-      render: (value: any, category: CategorieEmployesDTO) => (
+      render: (value: any, category: CategorieEmployesResponse) => (
         <span className="font-mono text-sm">{category.id}</span>
       ),
     },
     {
       key: 'cadre',
       header: 'Catégorie',
-      render: (value: any, category: CategorieEmployesDTO) => (
+      render: (value: any, category: CategorieEmployesResponse) => (
         <div className="font-medium">{category.cadre}</div>
       ),
     },
     {
       key: 'actions',
       header: 'Actions',
-      render: (value: any, category: CategorieEmployesDTO) => (
+      render: (value: any, category: CategorieEmployesResponse) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="h-8 w-8 p-0">

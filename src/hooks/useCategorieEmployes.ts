@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { categorieEmployesAPI } from '@/services/api/categorie-employes.api';
-import { CategorieEmployesDTO } from '@/types/entities';
+import { CategorieEmployesResponse } from '@/types/entities';
 import { Pageable } from '@/types/api';
 import toast from 'react-hot-toast';
 

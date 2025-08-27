@@ -2,82 +2,78 @@ import React from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { CategorieEmployesDTO } from '@/types/entities';
-import { Trash2, AlertTriangle } from 'lucide-react';
+import { CategorieEmployesResponse } from '@/types/entities';
+import { AlertTriangle } from 'lucide-react';
 
 interface DeleteCategoryModalProps {
   open: boolean;
   onClose: () => void;
-  category: CategorieEmployesDTO;
   onSuccess: () => void;
+  category: CategorieEmployesResponse;
   deleteCategory: (id: number) => Promise<void>;
   isDeleting: boolean;
 }
 
-export function DeleteCategoryModal({
-  open,
-  onClose,
+export function DeleteCategoryModal({ 
+  open, 
+  onClose, 
+  onSuccess, 
   category,
-  onSuccess,
-  deleteCategory,
-  isDeleting
+  deleteCategory, 
+  isDeleting 
 }: DeleteCategoryModalProps) {
   const handleDelete = async () => {
     try {
-      await deleteCategory(category.id!);
-      onSuccess();
+      if (category.id) {
+        await deleteCategory(category.id);
+        onSuccess();
+      }
     } catch (error) {
-      console.error('Erreur lors de la suppression de la catégorie:', error);
+      console.error('Erreur lors de la suppression:', error);
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[400px]">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Trash2 className="h-5 w-5 text-destructive" />
+          <DialogTitle className="flex items-center gap-2 text-destructive">
+            <AlertTriangle className="h-5 w-5" />
             Supprimer la catégorie
           </DialogTitle>
           <DialogDescription>
-            Êtes-vous sûr de vouloir supprimer la catégorie <strong>{category.cadre}</strong> ?
+            Êtes-vous sûr de vouloir supprimer cette catégorie d'employé ?
           </DialogDescription>
         </DialogHeader>
 
         <div className="py-4">
-          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-destructive">
-                  Attention - Cette action est irréversible
-                </p>
-                <div className="text-sm text-muted-foreground space-y-1">
-                  <p>• La catégorie sera définitivement supprimée</p>
-                  <p>• Les utilisateurs associés à cette catégorie devront être reclassés</p>
-                  <p>• Cette action ne peut pas être annulée</p>
-                </div>
-              </div>
-            </div>
+          <div className="bg-muted p-3 rounded-md">
+            <p className="font-medium">Catégorie à supprimer :</p>
+            <p className="text-lg font-semibold text-primary mt-1">
+              {category.cadre}
+            </p>
           </div>
-
-          <div className="mt-4 p-4 bg-muted rounded-lg">
-            <div className="text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Catégorie :</span>
-                <span className="font-medium">{category.cadre}</span>
-              </div>
-            </div>
+          
+          <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+            <p className="text-sm text-destructive">
+              <strong>Attention :</strong> Cette action est irréversible. 
+              Tous les employés associés à cette catégorie devront être réassignés.
+            </p>
           </div>
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose} disabled={isDeleting}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={isDeleting}
+          >
             Annuler
           </Button>
           <Button 
-            type="button" 
-            variant="destructive" 
+            type="button"
+            variant="destructive"
             onClick={handleDelete}
             disabled={isDeleting}
           >
@@ -87,7 +83,7 @@ export function DeleteCategoryModal({
                 Suppression...
               </>
             ) : (
-              'Supprimer définitivement'
+              'Supprimer'
             )}
           </Button>
         </DialogFooter>

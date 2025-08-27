@@ -7,10 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { Plus } from 'lucide-react';
 
 const createCategorySchema = z.object({
-  cadre: z.string().min(1, 'Le nom de la catégorie est requis').max(100, 'Le nom ne peut pas dépasser 100 caractères'),
+  cadre: z.string().min(1, 'Le nom de la catégorie est requis'),
 });
 
 type CreateCategoryForm = z.infer<typeof createCategorySchema>;
@@ -34,9 +33,9 @@ export function CreateCategoryModal({
     register,
     handleSubmit,
     formState: { errors },
-    reset,
+    reset
   } = useForm<CreateCategoryForm>({
-    resolver: zodResolver(createCategorySchema),
+    resolver: zodResolver(createCategorySchema)
   });
 
   const onSubmit = async (data: CreateCategoryForm) => {
@@ -45,7 +44,7 @@ export function CreateCategoryModal({
       reset();
       onSuccess();
     } catch (error) {
-      console.error('Erreur lors de la création de la catégorie:', error);
+      console.error('Erreur lors de la création:', error);
     }
   };
 
@@ -56,14 +55,11 @@ export function CreateCategoryModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[400px]">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Plus className="h-5 w-5" />
-            Nouvelle catégorie
-          </DialogTitle>
+          <DialogTitle>Nouvelle catégorie d'employé</DialogTitle>
           <DialogDescription>
-            Créez une nouvelle catégorie d'employé pour votre organisation
+            Créez une nouvelle catégorie d'employé pour l'organisation.
           </DialogDescription>
         </DialogHeader>
 
@@ -72,9 +68,8 @@ export function CreateCategoryModal({
             <Label htmlFor="cadre">Nom de la catégorie</Label>
             <Input
               id="cadre"
-              placeholder="Ex: Cadre supérieur, Manager, Employé..."
+              placeholder="Ex: Cadre supérieur, Employé, etc."
               {...register('cadre')}
-              className={errors.cadre ? 'border-destructive' : ''}
               disabled={isCreating}
             />
             {errors.cadre && (
@@ -82,22 +77,26 @@ export function CreateCategoryModal({
             )}
           </div>
 
-          <div className="text-sm text-muted-foreground">
-            <p>Cette catégorie sera disponible lors de la création ou modification d'un utilisateur.</p>
-          </div>
-
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleClose} disabled={isCreating}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClose}
+              disabled={isCreating}
+            >
               Annuler
             </Button>
-            <Button type="submit" disabled={isCreating}>
+            <Button 
+              type="submit" 
+              disabled={isCreating}
+            >
               {isCreating ? (
                 <>
                   <LoadingSpinner size="sm" className="mr-2" />
                   Création...
                 </>
               ) : (
-                'Créer la catégorie'
+                'Créer'
               )}
             </Button>
           </DialogFooter>
