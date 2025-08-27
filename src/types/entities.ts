@@ -1,19 +1,32 @@
 // DTOs des entités métier
 
-export interface UtilisateurDTO {
+export interface UtilisateurResponse {
   id?: number;
   nom: string;
   prenom: string;
   cin: string;
   email: string;
-  motDePasse?: string;
   telephone?: string;
   solde: number;
   role: string;
   isActive: boolean;
-  odooPartnerId?: number;
-  categorieEmployes?: CategorieEmployesResponse;
-  badge?: BadgeDTO;
+  badgeId?: number;
+  categorieEmployesId?: number;
+  cadre?: string; // From CategorieEmployes
+  badge?: BadgeResponse;
+}
+
+export interface UtilisateurRequest {
+  nom: string;
+  prenom: string;
+  cin: string;
+  email: string;
+  password: string;
+  telephone?: string;
+  solde?: number;
+  role: string;
+  categorieEmployesId?: number;
+  isActive?: boolean;
 }
 
 export interface ArticleDTO {
@@ -41,12 +54,12 @@ export interface CategorieEmployesResponse {
   cadre: string;
 }
 
-export interface BadgeDTO {
+export interface BadgeResponse {
   id?: number;
   codeBadge?: string;
   active: boolean;
   utilisateurId?: number;
-  statut: string;
+  utilisateurNom?: string;
 }
 
 export interface TransactionDTO {
@@ -58,7 +71,7 @@ export interface TransactionDTO {
   partSalariale: number;
   partPatronale: number;
   typePaiement: string;
-  utilisateur?: UtilisateurDTO;
+  utilisateur?: UtilisateurResponse;
   articles: ArticleDTO[];
 }
 
@@ -94,7 +107,7 @@ export interface RemboursementDTO {
   transactionId: number;
   numeroTicket?: string;
   utilisateurId: number;
-  utilisateur?: UtilisateurDTO;
+  utilisateur?: UtilisateurResponse;
   commentaireAdmin?: string;
   montant?: number; // Alias pour compatibilité
 }
@@ -120,7 +133,7 @@ export interface FeedbackDTO {
   id?: number;
   commentaire: string;
   utilisateurid?: number;
-  utilisateur?: UtilisateurDTO;
+  utilisateur?: UtilisateurResponse;
 }
 
 export interface TerminalPOS {
@@ -144,13 +157,13 @@ export interface RegisterRequest {
   nom: string;
   prenom: string;
   email: string;
-  password?: string;
-  cin?: string;
+  password: string;
+  cin: string;
   telephone?: string;
   role: 'SUPER_ADMIN' | 'ADMIN' | 'CAISSIER' | 'EMPLOYE';
   isActive?: boolean;
   solde?: number;
-  categorieEmployeId?: number;
+  categorieEmployesId?: number;
 }
 
 export interface ConfigPaiementRequest {

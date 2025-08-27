@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersAPI } from '@/services/api/users.api';
-import { UtilisateurDTO, RegisterRequest } from '@/types/entities';
+import { UtilisateurResponse, UtilisateurRequest } from '@/types/entities';
 import { Pageable } from '@/types/api';
 import toast from 'react-hot-toast';
 
@@ -39,7 +39,7 @@ export const useUsers = (pageable?: Pageable) => {
 
   // Mutation pour mettre à jour un utilisateur
   const updateUserMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<UtilisateurDTO> }) => 
+    mutationFn: ({ id, data }: { id: number; data: UtilisateurRequest }) => 
       usersAPI.updateUser(id, data),
     onSuccess: (updatedUser) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -65,47 +65,33 @@ export const useUsers = (pageable?: Pageable) => {
     }
   });
 
-  // Mutation pour recharger le solde
-  const chargeBalanceMutation = useMutation({
-    mutationFn: ({ userId, amount }: { userId: number; amount: number }) => 
-      usersAPI.chargeUserBalance(userId, amount),
+  // Mutation pour activer/désactiver un utilisateur
+  const toggleStatusMutation = useMutation({
+    mutationFn: ({ userId, isActive }: { userId: number; isActive: boolean }) => 
+      usersAPI.toggleUserStatus(userId, isActive),
     onSuccess: (updatedUser) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['user', updatedUser.id] });
-      toast.success(`Solde rechargé: ${updatedUser.solde}€`);
+      toast.success(`Statut utilisateur modifié`);
     },
     onError: (error: any) => {
-      toast.error('Erreur lors du rechargement du solde');
-      console.error('Erreur rechargement solde:', error);
+      toast.error('Erreur lors du changement de statut');
+      console.error('Erreur changement statut:', error);
     }
   });
 
-  // Mutation pour initialiser le solde
-  const initializeBalanceMutation = useMutation({
-    mutationFn: usersAPI.initializeUserBalance,
+  // Mutation pour déduire le solde
+  const deductBalanceMutation = useMutation({
+    mutationFn: ({ userId, amount, reason }: { userId: number; amount: number; reason: string }) => 
+      usersAPI.deductBalance(userId, amount, reason),
     onSuccess: (updatedUser) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['user', updatedUser.id] });
-      toast.success('Solde initialisé');
+      toast.success(`Solde déduit: ${updatedUser.solde}€`);
     },
     onError: (error: any) => {
-      toast.error('Erreur lors de l\'initialisation du solde');
-      console.error('Erreur initialisation solde:', error);
-    }
-  });
-
-  // Mutation pour changer la catégorie
-  const changeCategoryMutation = useMutation({
-    mutationFn: ({ userId, cadre }: { userId: number; cadre: string }) => 
-      usersAPI.changeUserCategory(userId, cadre),
-    onSuccess: (updatedUser) => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      queryClient.invalidateQueries({ queryKey: ['user', updatedUser.id] });
-      toast.success('Catégorie mise à jour');
-    },
-    onError: (error: any) => {
-      toast.error('Erreur lors du changement de catégorie');
-      console.error('Erreur changement catégorie:', error);
+      toast.error('Erreur lors de la déduction du solde');
+      console.error('Erreur déduction solde:', error);
     }
   });
 
@@ -120,17 +106,15 @@ export const useUsers = (pageable?: Pageable) => {
     createUser: createUserMutation.mutateAsync,
     updateUser: updateUserMutation.mutateAsync,
     deleteUser: deleteUserMutation.mutateAsync,
-    chargeBalance: chargeBalanceMutation.mutateAsync,
-    initializeBalance: initializeBalanceMutation.mutateAsync,
-    changeCategory: changeCategoryMutation.mutateAsync,
+    toggleStatus: toggleStatusMutation.mutateAsync,
+    deductBalance: deductBalanceMutation.mutateAsync,
 
     // États des mutations
     isCreating: createUserMutation.isPending,
     isUpdating: updateUserMutation.isPending,
     isDeleting: deleteUserMutation.isPending,
-    isChargingBalance: chargeBalanceMutation.isPending,
-    isInitializingBalance: initializeBalanceMutation.isPending,
-    isChangingCategory: changeCategoryMutation.isPending,
+    isTogglingStatus: toggleStatusMutation.isPending,
+    isDeductingBalance: deductBalanceMutation.isPending,
 
     // Refetch
     refetch: usersQuery.refetch,
@@ -144,24 +128,6 @@ export const useUser = (id: number) => {
     queryFn: () => usersAPI.getUserById(id),
     enabled: !!id,
     staleTime: 5 * 60 * 1000,
-  });
-};
-
-// Hook pour obtenir les utilisateurs non assignés
-export const useUnassignedUsers = (pageable?: Pageable) => {
-  return useQuery({
-    queryKey: ['users', 'unassigned', pageable],
-    queryFn: () => usersAPI.getUnassignedUsers(pageable),
-    staleTime: 2 * 60 * 1000,
-  });
-};
-
-// Hook pour obtenir les caissiers
-export const useCaissiers = (pageable?: Pageable) => {
-  return useQuery({
-    queryKey: ['users', 'caissiers', pageable],
-    queryFn: () => usersAPI.getCaissiers(pageable),
-    staleTime: 2 * 60 * 1000,
   });
 };
 
