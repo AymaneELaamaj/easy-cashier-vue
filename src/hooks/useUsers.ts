@@ -131,4 +131,23 @@ export const useUser = (id: number) => {
   });
 };
 
+// Hook pour obtenir les employés sans badge
+export const useEmployeesWithoutBadge = () => {
+  return useQuery({
+    queryKey: ['employees', 'without-badge'],
+    queryFn: async () => {
+      console.log('🔍 Fetching employees without badge...');
+      try {
+        const result = await usersAPI.getEmployeesWithoutBadge();
+        console.log('✅ Employees without badge fetched successfully:', result);
+        return result;
+      } catch (error) {
+        console.error('❌ Error fetching employees without badge:', error);
+        throw error;
+      }
+    },
+    staleTime: 2 * 60 * 1000,
+  });
+};
+
 export default useUsers;

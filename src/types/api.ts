@@ -6,6 +6,15 @@ export interface ApiResponse<T> {
   timestamp?: string;
 }
 
+// Interface spécifique pour les réponses paginées du backend
+export interface PagedApiResponse<T> {
+  timestamp: string;
+  status: number;
+  message: string;
+  page: Page<T>;
+  path: string;
+}
+
 export interface ErrorResponse {
   timestamp: string;
   status: number;

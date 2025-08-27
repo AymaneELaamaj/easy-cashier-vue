@@ -1,6 +1,6 @@
 // services/api/badges.api.ts
 import api from "./axios";
-import { ApiResponse, Page, Pageable } from "@/types/api";
+import { ApiResponse, Page, Pageable, PagedApiResponse } from "@/types/api";
 import { BadgeResponse } from "@/types/entities";
 
 /* -------------------- Helpers sûrs -------------------- */
@@ -104,17 +104,36 @@ export const badgesAPI = {
     if (pageable?.size !== undefined) params.append("size", String(pageable.size));
     if (pageable?.sort) params.append("sort", pageable.sort);
 
-    const url = `/badges/all${params.toString() ? `?${params}` : ""}`;
+    const url = `/badges/all${params.toString() ? `?${params}` : ''}`;
     console.log('📡 API: Requesting URL:', url);
 
     try {
-      const res = await api.get<ApiResponse<Page<BadgeResponse>>>(url);
-      console.log('📡 API: Raw response:', res);
+      const res = await api.get<PagedApiResponse<BadgeResponse>>(url);
+      console.log('📡 response API badges:', res.data);
+      console.log('📡 response structure check:');
+      console.log('📡 - res.data.status:', res.data.status);
+      console.log('📡 - res.data.page:', res.data.page);
+      console.log('📡 - type of res.data.page:', typeof res.data.page);
       
-      const result = pickPage<BadgeResponse>(res, pageable?.page ?? 0, pageable?.size ?? 10);
-      console.log('📡 API: Processed result:', result);
-      
-      return result;
+      // Le backend retourne une structure avec "page" contenant Page<BadgeResponse>
+      // Nous devons extraire res.data.page pour avoir Page<BadgeResponse>
+      if (res.data && res.data.page) {
+        console.log('📡 API: Extracted page data:', res.data.page);
+        return res.data.page;
+      } else {
+        console.warn('📡 API: No page data in response, returning empty page');
+        console.warn('📡 API: Full response object:', JSON.stringify(res.data, null, 2));
+        return {
+          content: [],
+          totalElements: 0,
+          totalPages: 0,
+          size: pageable?.size || 10,
+          number: pageable?.page || 0,
+          first: true,
+          last: true,
+          empty: true,
+        };
+      }
     } catch (error) {
       console.error('📡 API: Error in getAllBadges:', error);
       throw error;

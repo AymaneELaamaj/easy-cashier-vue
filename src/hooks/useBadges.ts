@@ -139,6 +139,27 @@ export function useBadges(pageable?: Pageable) {
     },
   });
 
+  const unassignMutation = useMutation({
+    mutationFn: async (badgeId: number) => {
+      console.log('Unassigning badge:', badgeId);
+      const result = await badgesAPI.unassignBadge(badgeId);
+      console.log('Badge unassigned:', result);
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ 
+        queryKey: ["badges"],
+        exact: false 
+      });
+      toast.success("Badge désassigné avec succès");
+    },
+    onError: (error: unknown) => {
+      console.error('Error unassigning badge:', error);
+      const msg = (error as { message?: string })?.message || "Erreur lors de la désassignation du badge";
+      toast.error(msg);
+    },
+  });
+
   return {
     data: query.data,              // Page<BadgeResponse>
     isLoading: query.isLoading,
@@ -149,9 +170,12 @@ export function useBadges(pageable?: Pageable) {
     activateBadge: activateMutation.mutateAsync,
     deactivateBadge: deactivateMutation.mutateAsync,
     assignBadge: assignMutation.mutateAsync,
+    unassignBadge: unassignMutation.mutateAsync,
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
     isDeleting: deleteMutation.isPending,
+    isAssigning: assignMutation.isPending,
+    isUnassigning: unassignMutation.isPending,
     refetch: query.refetch,
   };
 }

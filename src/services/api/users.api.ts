@@ -198,8 +198,23 @@ export const usersAPI = {
 
   // Obtenir utilisateurs sans badge
   getUsersWithoutBadge: async (): Promise<UtilisateurResponse[]> => {
+    console.log('🎫 Récupération des utilisateurs sans badge...');
     const response = await api.get('/utilisateurs/without-badge');
+    console.log('✅ Utilisateurs sans badge récupérés:', response.data);
     return response.data;
+  },
+
+  // Obtenir employés sans badge (role = EMPLOYE)
+  getEmployeesWithoutBadge: async (): Promise<UtilisateurResponse[]> => {
+    console.log('👥 Récupération des employés sans badge...');
+    // Utilisons l'endpoint existant et filtrons côté frontend
+    const response = await api.get('/utilisateurs/without-badge');
+    console.log('✅ Utilisateurs sans badge récupérés:', response.data);
+    
+    // Filtrer pour garder seulement les employés (role = EMPLOYE)
+    const employees = response.data.filter((user: UtilisateurResponse) => user.role === 'EMPLOYE');
+    console.log('✅ Employés sans badge filtrés:', employees);
+    return employees;
   }
 };
 

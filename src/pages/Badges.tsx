@@ -17,10 +17,10 @@ import { useBadges } from '@/hooks/useBadges';
 import { BadgeResponse } from '@/types/entities';
 import { Search, Plus, CreditCard, User, CheckCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { AssignBadgeModal } from '@/components/badges/AssignBadgeModal';
 // import { CreateBadgeModal } from '@/components/badges/CreateBadgeModal';
 // import { EditBadgeModal } from '@/components/badges/EditBadgeModal';
 // import { DeleteBadgeModal } from '@/components/badges/DeleteBadgeModal';
-// import { AssignBadgeModal } from '@/components/badges/AssignBadgeModal';
 
 export function Badges() {
   const [search, setSearch] = useState('');
@@ -41,9 +41,12 @@ export function Badges() {
     activateBadge,
     deactivateBadge,
     assignBadge,
+    unassignBadge,
     isCreating,
     isUpdating,
-    isDeleting
+    isDeleting,
+    isAssigning,
+    isUnassigning
   } = useBadges({ page, size: pageSize });
 
   // Debug logs
@@ -52,33 +55,7 @@ export function Badges() {
   console.log('🔍 Is loading:', isLoading);
   console.log('🔍 Error:', error);
 
-  // Test direct API call
-  useEffect(() => {
-    const testDirectAPI = async () => {
-      try {
-        console.log('🧪 Testing direct API call...');
-        // Check where the token is stored
-        console.log('🧪 localStorage token:', localStorage.getItem('easypos_access_token'));
-        console.log('🧪 cookies:', document.cookie);
-        
-        const response = await fetch('http://localhost:8080/api/badges/all?page=0&size=10', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('easypos_access_token') || 'no-token'}`
-          }
-        });
-        console.log('🧪 Direct fetch response:', response);
-        console.log('🧪 Response status:', response.status);
-        const data = await response.text();
-        console.log('🧪 Direct fetch data:', data);
-      } catch (error) {
-        console.error('🧪 Direct fetch error:', error);
-      }
-    };
-    
-    testDirectAPI();
-  }, []);
+
 
   const handleDelete = (badge: BadgeResponse) => {
     setSelectedBadge(badge);
@@ -90,11 +67,31 @@ export function Badges() {
     setShowAssignModal(true);
   };
 
+  const handleUnassign = async (badge: BadgeResponse) => {
+    if (!badge.id) return;
+    
+    try {
+      await unassignBadge(badge.id);
+    } catch (error) {
+      console.error('Error unassigning badge:', error);
+      // Le toast d'erreur sera affiché par le hook useBadges
+    }
+  };
+
   const handleToggleStatus = (badge: BadgeResponse) => {
     if (badge.active) {
       deactivateBadge(badge.id!);
     } else {
       activateBadge(badge.id!);
+    }
+  };
+
+  const handleAssignBadge = async (utilisateurId: number, badgeId: number) => {
+    try {
+      await assignBadge({ utilisateurId, badgeId });
+    } catch (error) {
+      console.error('Error assigning badge:', error);
+      throw error; // Re-throw pour que le modal puisse gérer l'erreur
     }
   };
 
@@ -188,7 +185,7 @@ export function Badges() {
       key: 'actions',
       header: 'Actions',
       render: (_value: unknown, badge: BadgeResponse) => (
-        <div className="flex space-x-2">
+        <div className="flex space-x-2 flex-wrap">
           {/* Bouton Activer/Désactiver */}
           <Button
             variant="outline"
@@ -209,8 +206,22 @@ export function Badges() {
               size="sm"
               onClick={() => handleAssign(badge)}
               className="border-blue-300 hover:bg-blue-50 text-blue-600 hover:text-blue-700"
+              disabled={isAssigning}
             >
               👤 Assigner
+            </Button>
+          )}
+          
+          {/* Bouton Désassigner (seulement si assigné) */}
+          {badge.utilisateurId && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleUnassign(badge)}
+              className="border-orange-300 hover:bg-orange-50 text-orange-600 hover:text-orange-700"
+              disabled={isUnassigning}
+            >
+              {isUnassigning ? '⏳' : '🚫'} Désassigner
             </Button>
           )}
           
@@ -483,7 +494,19 @@ export function Badges() {
         </DialogContent>
       </Dialog>
 
-      {/* TODO: Implement assign and edit modals */}
+      {/* Assign Badge Modal */}
+      <AssignBadgeModal
+        badge={selectedBadge}
+        isOpen={showAssignModal}
+        onClose={() => {
+          setShowAssignModal(false);
+          setSelectedBadge(null);
+        }}
+        onAssign={handleAssignBadge}
+        isAssigning={isAssigning}
+      />
+
+      {/* TODO: Implement edit modal */}
     </div>
   );
 }
