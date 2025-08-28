@@ -65,7 +65,7 @@ export function EditArticleModal({ open, onOpenChange, article }: EditArticleMod
       toast.error('Données invalides');
       return;
     }
-
+ 
     try {
       await updateArticle({ id: article.id, data: formData as ArticleDTO });
       toast.success('Article mis à jour avec succès !');
@@ -77,6 +77,7 @@ export function EditArticleModal({ open, onOpenChange, article }: EditArticleMod
   };
 
   if (!article) return null;
+  console.log('DEBUG/article prop =>', article);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -86,8 +87,8 @@ export function EditArticleModal({ open, onOpenChange, article }: EditArticleMod
           <DialogDescription>
             Modifiez les informations de l'article "{article.nom}".
           </DialogDescription>
-        </DialogHeader>
-        
+        </DialogHeader> 
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -139,6 +140,7 @@ export function EditArticleModal({ open, onOpenChange, article }: EditArticleMod
                 placeholder="0"
               />
             </div>
+
             {/* Champ Code Odoo supprimé de l'édition */}
           </div>
 
