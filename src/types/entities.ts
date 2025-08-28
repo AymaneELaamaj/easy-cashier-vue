@@ -43,7 +43,6 @@ export interface ArticleDTO {
   
 }
 
-}
 
 export interface CategorieEmployesResponse {
   id?: number;
