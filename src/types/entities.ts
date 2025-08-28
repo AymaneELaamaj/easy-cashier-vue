@@ -14,7 +14,7 @@ export interface UtilisateurResponse {
   categorieEmployesId?: number;
   codeBadge?: string; // From Badge
   cadre?: string; // From CategorieEmployes
-  badge?: BadgeResponse;
+  
 }
 
 export interface UtilisateurRequest {
@@ -40,15 +40,9 @@ export interface ArticleDTO {
   quantite?: number;
   disponible: boolean;
   status: boolean;
-  categorie?: CategorieDTO;
+  
 }
 
-export interface CategorieDTO {
-  id?: number;
-  libelle: string;
-  odooCategoryId?: number;
-  statut: boolean;
-}
 
 export interface CategorieEmployesResponse {
   id?: number;
