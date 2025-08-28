@@ -4,86 +4,71 @@ import { ConfigPaiementDTO } from '@/types/entities';
 import toast from 'react-hot-toast';
 
 export const useConfigs = () => {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
 
-  // Query principale pour lister les configurations
   const configsQuery = useQuery({
     queryKey: ['configs'],
     queryFn: () => configAPI.getAllConfigs(),
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 2 * 60 * 1000,
   });
 
-  // Mutation pour créer une configuration
   const createConfigMutation = useMutation({
-    mutationFn: configAPI.createConfig,
-    onSuccess: (newConfig: ConfigPaiementDTO) => {
-      queryClient.invalidateQueries({ queryKey: ['configs'] });
-      toast.success(`Configuration "${newConfig.typePaiement}" créée avec succès`);
+    mutationFn: (payload: ConfigPaiementDTO) => configAPI.createConfig(payload),
+    onSuccess: (newCfg) => {
+      qc.invalidateQueries({ queryKey: ['configs'] });
+      toast.success(`Type de paiement défini: ${newCfg.typePaiement}`);
     },
-    onError: (error: any) => {
-      toast.error('Erreur lors de la création de la configuration');
-      console.error('Erreur création configuration:', error);
-    }
+    onError: (e: any) => {
+      console.error(e);
+      toast.error('Erreur lors de la définition du type de paiement');
+    },
   });
 
-  // Mutation pour mettre à jour une configuration
   const updateConfigMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: ConfigPaiementDTO }) => 
+    mutationFn: ({ id, data }: { id: number; data: ConfigPaiementDTO }) =>
       configAPI.updateConfig(id, data),
-    onSuccess: (updatedConfig: ConfigPaiementDTO) => {
-      queryClient.invalidateQueries({ queryKey: ['configs'] });
-      queryClient.invalidateQueries({ queryKey: ['config', updatedConfig.id] });
-      toast.success(`Configuration "${updatedConfig.typePaiement}" mise à jour`);
+    onSuccess: (updated) => {
+      qc.invalidateQueries({ queryKey: ['configs'] });
+      toast.success(`Type de paiement mis à jour: ${updated.typePaiement}`);
     },
-    onError: (error: any) => {
-      toast.error('Erreur lors de la mise à jour de la configuration');
-      console.error('Erreur mise à jour configuration:', error);
-    }
+    onError: (e: any) => {
+      console.error(e);
+      toast.error('Erreur lors de la mise à jour du type de paiement');
+    },
   });
 
-  // Mutation pour supprimer une configuration
   const deleteConfigMutation = useMutation({
-    mutationFn: configAPI.deleteConfig,
+    mutationFn: (id: number) => configAPI.deleteConfig(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['configs'] });
-      toast.success('Configuration supprimée avec succès');
+      qc.invalidateQueries({ queryKey: ['configs'] });
+      toast.success('Configuration supprimée');
     },
-    onError: (error: any) => {
+    onError: (e: any) => {
+      console.error(e);
       toast.error('Erreur lors de la suppression de la configuration');
-      console.error('Erreur suppression configuration:', error);
-    }
+    },
   });
 
   return {
-    // Données
-    configs: configsQuery.data,
+    // data
+    configs: configsQuery.data ?? [],
     isLoading: configsQuery.isLoading,
-    error: configsQuery.error,
+    error: configsQuery.error as any,
     isError: configsQuery.isError,
 
-    // Actions
+    // actions
     createConfig: createConfigMutation.mutateAsync,
     updateConfig: updateConfigMutation.mutateAsync,
     deleteConfig: deleteConfigMutation.mutateAsync,
 
-    // États des mutations
+    // states
     isCreating: createConfigMutation.isPending,
     isUpdating: updateConfigMutation.isPending,
     isDeleting: deleteConfigMutation.isPending,
 
-    // Refetch
+    // refetch
     refetch: configsQuery.refetch,
   };
-};
-
-// Hook pour obtenir une configuration spécifique
-export const useConfig = (id: number) => {
-  return useQuery({
-    queryKey: ['config', id],
-    queryFn: () => configAPI.getConfigById(id),
-    enabled: !!id,
-    staleTime: 5 * 60 * 1000,
-  });
 };
 
 export default useConfigs;
