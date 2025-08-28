@@ -92,10 +92,19 @@ export default function Subventions() {
       header: "Actions",
       render: (_: any, s: SubventionDTO) => (
         <div className="flex space-x-2">
-          <Button variant="outline" size="sm" onClick={() => { setSelectedSubvention(s); setShowEditModal(true); }}>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="border-blue-500 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+            onClick={() => { setSelectedSubvention(s); setShowEditModal(true); }}
+          >
             Modifier
           </Button>
-          <Button variant="outline" size="sm" onClick={() => { setSelectedSubvention(s); setShowDeleteModal(true); }}>
+          <Button 
+            variant="destructive" 
+            size="sm"
+            onClick={() => { setSelectedSubvention(s); setShowDeleteModal(true); }}
+          >
             Supprimer
           </Button>
         </div>
