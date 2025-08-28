@@ -90,7 +90,7 @@ export interface SubventionDTO {
   plafondMois: number;
   actif: boolean;
   categorieEmployesId: number;
-  cadre?: string;
+  categorieEmployesNom?: string;
 }
 
 export interface RemboursementDTO {

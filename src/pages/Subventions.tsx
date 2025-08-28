@@ -46,7 +46,7 @@ export default function Subventions() {
     {
       key: "categorieEmployesId",
       header: "Catégorie Employés",
-      render: (_: any, s: SubventionDTO) => <div className="text-sm">{s.cadre}</div>,
+      render: (_: any, s: SubventionDTO) => <div className="text-sm">{s.categorieEmployesNom}</div>,
     },
     {
       key: "taux",
