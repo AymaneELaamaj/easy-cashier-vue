@@ -89,9 +89,78 @@ export const useUsers = (pageable?: Pageable) => {
       queryClient.invalidateQueries({ queryKey: ['user', updatedUser.id] });
       toast.success(`Solde déduit: ${updatedUser.solde}€`);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast.error('Erreur lors de la déduction du solde');
       console.error('Erreur déduction solde:', error);
+    }
+  });
+
+  // Mutation pour charger le solde
+  const chargeBalanceMutation = useMutation({
+    mutationFn: ({ userId, amount }: { userId: number; amount: number }) => 
+      usersAPI.chargeBalance(userId, amount),
+    onSuccess: (updatedUser) => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['user', updatedUser.id] });
+      toast.success(`Solde chargé: ${updatedUser.solde}€`);
+    },
+    onError: (error: unknown) => {
+      toast.error('Erreur lors du chargement du solde');
+      console.error('Erreur chargement solde:', error);
+    }
+  });
+
+  // Mutation pour initialiser le solde
+  const initializeBalanceMutation = useMutation({
+    mutationFn: (userId: number) => usersAPI.initializeBalance(userId),
+    onSuccess: (updatedUser) => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['user', updatedUser.id] });
+      toast.success('Solde initialisé avec succès');
+    },
+    onError: (error: unknown) => {
+      toast.error('Erreur lors de l\'initialisation du solde');
+      console.error('Erreur initialisation solde:', error);
+    }
+  });
+
+  // Mutation pour définir la catégorie
+  const setCategoryMutation = useMutation({
+    mutationFn: ({ userId, cadre }: { userId: number; cadre: string }) => 
+      usersAPI.setCategory(userId, cadre),
+    onSuccess: (updatedUser) => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['user', updatedUser.id] });
+      toast.success('Catégorie mise à jour avec succès');
+    },
+    onError: (error: unknown) => {
+      toast.error('Erreur lors de la mise à jour de la catégorie');
+      console.error('Erreur catégorie:', error);
+    }
+  });
+
+  // Mutation pour notification solde faible
+  const notifyLowBalanceMutation = useMutation({
+    mutationFn: ({ userId, threshold }: { userId: number; threshold: number }) => 
+      usersAPI.notifyLowBalance(userId, threshold),
+    onSuccess: () => {
+      toast.success('Notification de solde faible envoyée');
+    },
+    onError: (error: unknown) => {
+      toast.error('Erreur lors de l\'envoi de la notification');
+      console.error('Erreur notification:', error);
+    }
+  });
+
+  // Mutation pour notification de bienvenue
+  const sendWelcomeMutation = useMutation({
+    mutationFn: (userId: number) => usersAPI.sendWelcomeNotification(userId),
+    onSuccess: () => {
+      toast.success('Notification de bienvenue envoyée');
+    },
+    onError: (error: unknown) => {
+      toast.error('Erreur lors de l\'envoi de la notification de bienvenue');
+      console.error('Erreur notification bienvenue:', error);
     }
   });
 
@@ -108,6 +177,11 @@ export const useUsers = (pageable?: Pageable) => {
     deleteUser: deleteUserMutation.mutateAsync,
     toggleStatus: toggleStatusMutation.mutateAsync,
     deductBalance: deductBalanceMutation.mutateAsync,
+    chargeBalance: chargeBalanceMutation.mutateAsync,
+    initializeBalance: initializeBalanceMutation.mutateAsync,
+    setCategory: setCategoryMutation.mutateAsync,
+    notifyLowBalance: notifyLowBalanceMutation.mutateAsync,
+    sendWelcome: sendWelcomeMutation.mutateAsync,
 
     // États des mutations
     isCreating: createUserMutation.isPending,
@@ -115,6 +189,11 @@ export const useUsers = (pageable?: Pageable) => {
     isDeleting: deleteUserMutation.isPending,
     isTogglingStatus: toggleStatusMutation.isPending,
     isDeductingBalance: deductBalanceMutation.isPending,
+    isChargingBalance: chargeBalanceMutation.isPending,
+    isInitializingBalance: initializeBalanceMutation.isPending,
+    isSettingCategory: setCategoryMutation.isPending,
+    isNotifyingLowBalance: notifyLowBalanceMutation.isPending,
+    isSendingWelcome: sendWelcomeMutation.isPending,
 
     // Refetch
     refetch: usersQuery.refetch,

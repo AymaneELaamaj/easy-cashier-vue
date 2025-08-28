@@ -117,6 +117,17 @@ export function Users() {
   const [passwordResetUser, setPasswordResetUser] = useState<UtilisateurResponse | null>(null);
   const [isPasswordResetModalOpen, setIsPasswordResetModalOpen] = useState(false);
 
+  // New administrative states
+  const [chargeAmount, setChargeAmount] = useState<number>(0);
+  const [chargeUser, setChargeUser] = useState<UtilisateurResponse | null>(null);
+  const [isChargeModalOpen, setIsChargeModalOpen] = useState(false);
+  const [categoryUser, setCategoryUser] = useState<UtilisateurResponse | null>(null);
+  const [categoryValue, setCategoryValue] = useState<string>('');
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [notifyUser, setNotifyUser] = useState<UtilisateurResponse | null>(null);
+  const [notifyThreshold, setNotifyThreshold] = useState<number>(10);
+  const [isNotifyModalOpen, setIsNotifyModalOpen] = useState(false);
+
   // Hook for users data
   const {
     users,
@@ -127,11 +138,21 @@ export function Users() {
     deleteUser,
     toggleStatus,
     deductBalance,
+    chargeBalance,
+    initializeBalance,
+    setCategory,
+    notifyLowBalance,
+    sendWelcome,
     isCreating,
     isUpdating,
     isDeleting,
     isTogglingStatus,
     isDeductingBalance,
+    isChargingBalance,
+    isInitializingBalance,
+    isSettingCategory,
+    isNotifyingLowBalance,
+    isSendingWelcome,
     refetch
   } = useUsers({ page, size: pageSize });
 
@@ -269,6 +290,57 @@ export function Users() {
     }
   };
 
+  // Handle balance charge
+  const handleChargeBalance = async () => {
+    if (!chargeUser || chargeAmount <= 0) return;
+
+    try {
+      await chargeBalance({
+        userId: chargeUser.id!,
+        amount: chargeAmount
+      });
+      setIsChargeModalOpen(false);
+      setChargeUser(null);
+      setChargeAmount(0);
+    } catch (error) {
+      toast.error('Erreur lors du chargement du solde');
+    }
+  };
+
+  // Handle category setting
+  const handleSetCategory = async () => {
+    if (!categoryUser || !categoryValue.trim()) return;
+
+    try {
+      await setCategory({
+        userId: categoryUser.id!,
+        cadre: categoryValue
+      });
+      setIsCategoryModalOpen(false);
+      setCategoryUser(null);
+      setCategoryValue('');
+    } catch (error) {
+      toast.error('Erreur lors de la définition de la catégorie');
+    }
+  };
+
+  // Handle notification
+  const handleNotifyLowBalance = async () => {
+    if (!notifyUser || notifyThreshold <= 0) return;
+
+    try {
+      await notifyLowBalance({
+        userId: notifyUser.id!,
+        threshold: notifyThreshold
+      });
+      setIsNotifyModalOpen(false);
+      setNotifyUser(null);
+      setNotifyThreshold(10);
+    } catch (error) {
+      toast.error('Erreur lors de l\'envoi de la notification');
+    }
+  };
+
   // Handle password reset
   const handlePasswordReset = async () => {
     if (!passwordResetUser) return;
@@ -309,6 +381,27 @@ export function Users() {
       header: 'Catégorie',
       render: (_value: unknown, user: UtilisateurResponse) => (
         <span className="text-sm">{user.cadre || 'Non définie'}</span>
+      ),
+    },
+    {
+      key: 'codeBadge',
+      header: 'Code Badge',
+      render: (_value: unknown, user: UtilisateurResponse) => (
+        <div className="text-sm">
+          {user.codeBadge ? (
+            <div className="flex flex-col space-y-1">
+              <span className="font-mono text-blue-600 font-medium">{user.codeBadge}</span>
+              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                🏷️ Assigné
+              </Badge>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-1">
+              <span className="w-2 h-2 bg-yellow-400 rounded-full"></span>
+              <span className="text-yellow-700 text-xs">Sans badge</span>
+            </div>
+          )}
+        </div>
       ),
     },
     {
@@ -390,6 +483,66 @@ export function Users() {
             >
               <Wallet className="mr-2 h-4 w-4" />
               Déduire solde
+            </DropdownMenuItem>
+            
+            <DropdownMenuItem 
+              onClick={(e) => {
+                e.stopPropagation();
+                setChargeUser(user);
+                setIsChargeModalOpen(true);
+              }}
+              className="cursor-pointer text-green-600 focus:text-green-700"
+            >
+              <DollarSign className="mr-2 h-4 w-4" />
+              Charger solde
+            </DropdownMenuItem>
+            
+            <DropdownMenuItem 
+              onClick={(e) => {
+                e.stopPropagation();
+                initializeBalance(user.id!);
+              }}
+              className="cursor-pointer"
+              disabled={isInitializingBalance}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Initialiser solde
+            </DropdownMenuItem>
+            
+            <DropdownMenuItem 
+              onClick={(e) => {
+                e.stopPropagation();
+                setCategoryUser(user);
+                setIsCategoryModalOpen(true);
+              }}
+              className="cursor-pointer"
+            >
+              <Settings className="mr-2 h-4 w-4" />
+              Définir catégorie
+            </DropdownMenuItem>
+            
+            <DropdownMenuItem 
+              onClick={(e) => {
+                e.stopPropagation();
+                setNotifyUser(user);
+                setIsNotifyModalOpen(true);
+              }}
+              className="cursor-pointer text-orange-600 focus:text-orange-700"
+            >
+              <AlertCircle className="mr-2 h-4 w-4" />
+              Notifier solde faible
+            </DropdownMenuItem>
+            
+            <DropdownMenuItem 
+              onClick={(e) => {
+                e.stopPropagation();
+                sendWelcome(user.id!);
+              }}
+              className="cursor-pointer text-blue-600 focus:text-blue-700"
+              disabled={isSendingWelcome}
+            >
+              <Award className="mr-2 h-4 w-4" />
+              Notification bienvenue
             </DropdownMenuItem>
             
             <DropdownMenuItem 
@@ -1128,6 +1281,153 @@ export function Users() {
             </Button>
             <Button onClick={handlePasswordReset}>
               Réinitialiser
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Charge Balance Modal */}
+      <Dialog open={isChargeModalOpen} onOpenChange={setIsChargeModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>💰 Charger le solde</DialogTitle>
+            <DialogDescription>
+              Ajoutez des fonds au compte de {chargeUser?.prenom} {chargeUser?.nom}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+              <p className="text-sm text-green-800">
+                <strong>Solde actuel:</strong> {formatCurrency(chargeUser?.solde || 0)}
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="chargeAmount">Montant à ajouter (€)</Label>
+              <Input
+                id="chargeAmount"
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={chargeAmount}
+                onChange={(e) => setChargeAmount(Number(e.target.value))}
+                placeholder="Entrez le montant"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsChargeModalOpen(false);
+                setChargeUser(null);
+                setChargeAmount(0);
+              }}
+            >
+              Annuler
+            </Button>
+            <Button 
+              onClick={handleChargeBalance}
+              disabled={chargeAmount <= 0 || isChargingBalance}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {isChargingBalance ? "Chargement..." : "Charger"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Category Modal */}
+      <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>📂 Définir la catégorie</DialogTitle>
+            <DialogDescription>
+              Définissez la catégorie professionnelle de {categoryUser?.prenom} {categoryUser?.nom}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-sm text-blue-800">
+                <strong>Catégorie actuelle:</strong> {categoryUser?.cadre || 'Non définie'}
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="categoryValue">Nouvelle catégorie</Label>
+              <Input
+                id="categoryValue"
+                type="text"
+                value={categoryValue}
+                onChange={(e) => setCategoryValue(e.target.value)}
+                placeholder="Ex: Cadre, Technicien, Agent..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsCategoryModalOpen(false);
+                setCategoryUser(null);
+                setCategoryValue('');
+              }}
+            >
+              Annuler
+            </Button>
+            <Button 
+              onClick={handleSetCategory}
+              disabled={!categoryValue.trim() || isSettingCategory}
+            >
+              {isSettingCategory ? "Mise à jour..." : "Définir"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Notify Low Balance Modal */}
+      <Dialog open={isNotifyModalOpen} onOpenChange={setIsNotifyModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>🔔 Notifier solde faible</DialogTitle>
+            <DialogDescription>
+              Envoyer une notification de solde faible à {notifyUser?.prenom} {notifyUser?.nom}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-4 bg-orange-50 border border-orange-200 rounded-md">
+              <p className="text-sm text-orange-800">
+                <strong>Solde actuel:</strong> {formatCurrency(notifyUser?.solde || 0)}
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="notifyThreshold">Seuil de notification (€)</Label>
+              <Input
+                id="notifyThreshold"
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={notifyThreshold}
+                onChange={(e) => setNotifyThreshold(Number(e.target.value))}
+                placeholder="Seuil minimum"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsNotifyModalOpen(false);
+                setNotifyUser(null);
+                setNotifyThreshold(10);
+              }}
+            >
+              Annuler
+            </Button>
+            <Button 
+              onClick={handleNotifyLowBalance}
+              disabled={notifyThreshold <= 0 || isNotifyingLowBalance}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {isNotifyingLowBalance ? "Envoi..." : "Notifier"}
             </Button>
           </DialogFooter>
         </DialogContent>

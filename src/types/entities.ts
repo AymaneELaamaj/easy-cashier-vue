@@ -12,6 +12,7 @@ export interface UtilisateurResponse {
   isActive: boolean;
   badgeId?: number;
   categorieEmployesId?: number;
+  codeBadge?: string; // From Badge
   cadre?: string; // From CategorieEmployes
   badge?: BadgeResponse;
 }

@@ -215,6 +215,60 @@ export const usersAPI = {
     const employees = response.data.filter((user: UtilisateurResponse) => user.role === 'EMPLOYE');
     console.log('✅ Employés sans badge filtrés:', employees);
     return employees;
+  },
+
+  // Charger le solde d'un utilisateur
+  chargeBalance: async (id: number, amount: number): Promise<UtilisateurResponse> => {
+    console.log('💰 Chargement solde utilisateur ID:', id, 'montant:', amount);
+    const response = await api.put(`/utilisateurs/${id}/charge-balance?amount=${amount}`);
+    console.log('✅ Solde chargé');
+    return response.data;
+  },
+
+  // Initialiser le solde d'un utilisateur
+  initializeBalance: async (id: number): Promise<UtilisateurResponse> => {
+    console.log('🔄 Initialisation solde utilisateur ID:', id);
+    const response = await api.put(`/utilisateurs/${id}/initialize-balance`);
+    console.log('✅ Solde initialisé');
+    return response.data;
+  },
+
+  // Définir la catégorie d'un utilisateur
+  setCategory: async (id: number, cadre: string): Promise<UtilisateurResponse> => {
+    console.log('📂 Définition catégorie utilisateur ID:', id, 'cadre:', cadre);
+    const response = await api.put(`/utilisateurs/${id}/set-category?cadre=${encodeURIComponent(cadre)}`);
+    console.log('✅ Catégorie définie');
+    return response.data;
+  },
+
+  // Obtenir l'historique du solde d'un utilisateur
+  getBalanceHistory: async (userId: number): Promise<Array<{ date: string; amount: number; type: string; reason: string }>> => {
+    console.log('📊 Récupération historique solde utilisateur ID:', userId);
+    const response = await api.get(`/utilisateurs/${userId}/balance-history`);
+    console.log('✅ Historique solde récupéré');
+    return response.data;
+  },
+
+  // Obtenir le rapport d'activité d'un utilisateur
+  getUserActivityReport: async (userId: number, startDate: string, endDate: string): Promise<Record<string, unknown>> => {
+    console.log('📈 Récupération rapport activité utilisateur ID:', userId);
+    const response = await api.get(`/utilisateurs/${userId}/activity-report?startDate=${startDate}&endDate=${endDate}`);
+    console.log('✅ Rapport activité récupéré');
+    return response.data;
+  },
+
+  // Notifier utilisateur pour solde faible
+  notifyLowBalance: async (userId: number, threshold: number): Promise<void> => {
+    console.log('🔔 Notification solde faible utilisateur ID:', userId, 'seuil:', threshold);
+    await api.post(`/utilisateurs/${userId}/notify-low-balance?threshold=${threshold}`);
+    console.log('✅ Notification envoyée');
+  },
+
+  // Envoyer notification de bienvenue
+  sendWelcomeNotification: async (userId: number): Promise<void> => {
+    console.log('👋 Envoi notification bienvenue utilisateur ID:', userId);
+    await api.post(`/utilisateurs/${userId}/send-welcome`);
+    console.log('✅ Notification bienvenue envoyée');
   }
 };
 
