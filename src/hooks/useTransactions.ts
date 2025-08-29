@@ -1,8 +1,10 @@
+// /src/hooks/useTransactions.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { transactionsAPI } from '@/services/api/transactions.api';
 import { TransactionDTO } from '@/types/entities';
 import toast from 'react-hot-toast';
 
+// Historique complet
 export const useTransactions = () => {
   const queryClient = useQueryClient();
 
@@ -15,7 +17,8 @@ export const useTransactions = () => {
   const cancelTransactionMutation = useMutation({
     mutationFn: ({ id, motif }: { id: number; motif?: string }) =>
       transactionsAPI.cancelTransaction(id, motif),
-    onSuccess: (t) => {
+    onSuccess: (t: TransactionDTO) => {
+      // Invalider toutes les listes de transactions (historique + période + me)
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       toast.success(`Transaction ${t.numeroTicket} annulée`);
     },
@@ -26,7 +29,7 @@ export const useTransactions = () => {
   });
 
   return {
-    transactions: historiqueQuery.data ?? [],      // <-- toujours un array
+    transactions: historiqueQuery.data ?? [],   // toujours un array
     isLoading: historiqueQuery.isLoading,
     error: historiqueQuery.error,
     isError: historiqueQuery.isError,
@@ -37,3 +40,16 @@ export const useTransactions = () => {
     refetch: historiqueQuery.refetch,
   };
 };
+
+// Historique par période
+export const useTransactionsPeriode = (dateDebut?: string, dateFin?: string) => {
+  const enabled = Boolean(dateDebut && dateFin);
+  return useQuery<TransactionDTO[]>({
+    queryKey: ['transactions', 'periode', dateDebut, dateFin],
+    queryFn: () => transactionsAPI.getHistoriquePeriode(dateDebut!, dateFin!),
+    enabled,
+    staleTime: 60 * 1000,
+  });
+};
+
+export default useTransactions;

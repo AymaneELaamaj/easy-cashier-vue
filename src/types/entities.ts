@@ -66,6 +66,7 @@ export interface TransactionDTO {
   partSalariale: number;
   partPatronale: number;
   typePaiement: string;
+  utilisateurEmail?: string;
   utilisateur?: UtilisateurResponse;
   articles: ArticleDTO[];
 }
