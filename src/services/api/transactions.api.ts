@@ -1,58 +1,68 @@
 import api from './axios';
-import { ApiResponse } from '@/types/api';
 import { TransactionDTO } from '@/types/entities';
 
+/** Unwrap compatible avec tes deux formes:
+ *  - { data: ... }
+ *  - { page: { content: [...] } }
+ */
+function unwrap<T>(res: any): T {
+  const payload = res?.data ?? res;
+  if (payload?.data !== undefined) return payload.data as T;
+  if (payload?.page?.content !== undefined) return payload.page.content as T;
+  return payload as T;
+}
+
 export const transactionsAPI = {
-  // Obtenir l'historique complet des transactions
+  // Historique complet (Page -> content[])
   getHistorique: async (): Promise<TransactionDTO[]> => {
-    const response = await api.get<ApiResponse<TransactionDTO[]>>('/transactions/historique');
-    return response.data.data;
+    const res = await api.get('/transactions/historique');
+    return unwrap<TransactionDTO[]>(res);
   },
 
-  // Obtenir l'historique des transactions par période
+  // Historique par période (Page -> content[])
   getHistoriquePeriode: async (dateDebut: string, dateFin: string): Promise<TransactionDTO[]> => {
-    const response = await api.get<ApiResponse<TransactionDTO[]>>(
+    const res = await api.get(
       `/transactions/historique/periode?dateDebut=${dateDebut}&dateFin=${dateFin}`
     );
-    return response.data.data;
+    return unwrap<TransactionDTO[]>(res);
   },
 
-  // Obtenir les transactions d'un utilisateur par période
+  // Historique utilisateur par période (Page -> content[])
   getHistoriqueUtilisateur: async (
-    utilisateurId: number, 
-    dateDebut: string, 
+    utilisateurId: number,
+    dateDebut: string,
     dateFin: string
   ): Promise<TransactionDTO[]> => {
-    const response = await api.get<ApiResponse<TransactionDTO[]>>(
+    const res = await api.get(
       `/transactions/utilisateur/${utilisateurId}/periode?dateDebut=${dateDebut}&dateFin=${dateFin}`
     );
-    return response.data.data;
+    return unwrap<TransactionDTO[]>(res);
   },
 
-  // Obtenir une transaction par ID
+  // Transaction par ID (objet -> data)
   getTransactionById: async (id: number): Promise<TransactionDTO> => {
-    const response = await api.get<ApiResponse<TransactionDTO>>(`/transactions/${id}`);
-    return response.data.data;
+    const res = await api.get(`/transactions/${id}`);
+    return unwrap<TransactionDTO>(res);
   },
 
-  // Obtenir une transaction par numéro de ticket
+  // Transaction par ticket (objet -> data)
   getTransactionByTicket: async (numeroTicket: string): Promise<TransactionDTO> => {
-    const response = await api.get<ApiResponse<TransactionDTO>>(`/transactions/ticket/${encodeURIComponent(numeroTicket)}`);
-    return response.data.data;
+    const res = await api.get(`/transactions/ticket/${encodeURIComponent(numeroTicket)}`);
+    return unwrap<TransactionDTO>(res);
   },
 
-  // Obtenir les transactions de l'utilisateur connecté
+  // Mes transactions (Page -> content[])
   getMyTransactions: async (): Promise<TransactionDTO[]> => {
-    const response = await api.get<ApiResponse<TransactionDTO[]>>('/transactions/mes-transactions');
-    return response.data.data;
+    const res = await api.get('/transactions/mes-transactions');
+    return unwrap<TransactionDTO[]>(res);
   },
 
-  // Annuler une transaction
+  // Annuler une transaction (objet -> data)
   cancelTransaction: async (id: number, motif?: string): Promise<TransactionDTO> => {
     const body = motif ? { motif } : {};
-    const response = await api.post<ApiResponse<TransactionDTO>>(`/transactions/${id}/annuler`, body);
-    return response.data.data;
-  }
+    const res = await api.post(`/transactions/${id}/annuler`, body);
+    return unwrap<TransactionDTO>(res);
+  },
 };
 
 export default transactionsAPI;
