@@ -1,16 +1,16 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { UtilisateurDTO, LoginRequest } from '@/types/entities';
+import { UtilisateurResponse, LoginRequest } from '@/types/entities';
 
 interface AuthContextType {
   // État
-  currentUser: UtilisateurDTO | undefined;
+  currentUser: UtilisateurResponse | undefined;
   isAuthenticated: boolean;
   isLoadingUser: boolean;
   userError: any;
 
   // Actions
-  login: (credentials: LoginRequest) => Promise<UtilisateurDTO>;
+  login: (credentials: LoginRequest) => Promise<UtilisateurResponse>;
   logout: () => Promise<void>;
   isLoggingIn: boolean;
   isLoggingOut: boolean;

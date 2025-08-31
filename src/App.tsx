@@ -88,7 +88,7 @@ const AppRoutes = () => (
     } />
 
     <Route path="/transactions" element={
-      <ProtectedRoute requiredRoles={['ADMIN', 'SUPER_ADMIN']}>
+      <ProtectedRoute requiredRoles={['ADMIN', 'SUPER_ADMIN','EMPLOYE']}>
         <AppLayout>
           <Transactions />
         </AppLayout>

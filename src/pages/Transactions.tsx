@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { DataTable } from '@/components/ui/DataTable';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { useTransactions, useTransactionsPeriode } from '@/hooks/useTransactions';
+import { useTransactions, useTransactionsPeriode ,useTransactionsBasedOnRole} from '@/hooks/useTransactions';
 import { TransactionDTO } from '@/types/entities';
 import { Search, Receipt, CreditCard, TrendingUp, Calendar, RefreshCw, Filter, X } from 'lucide-react';
 import { format } from 'date-fns';
@@ -38,7 +38,7 @@ export function Transactions() {
     cancelTransaction,
     isCancelling,
     refetch: refetchAll,
-  } = useTransactions();
+  } = useTransactionsBasedOnRole();
 
   const periodeQuery = useTransactionsPeriode(dateDebut || undefined, dateFin || undefined);
   const periodeTransactions = periodeQuery.data ?? [];

@@ -75,6 +75,17 @@ api.interceptors.response.use(
 
     // Gestion des erreurs 401 - Token expiré
     if (error.response?.status === 401 && !originalRequest._retry) {
+      // Éviter le refresh sur les endpoints d'auth pour éviter les boucles infinies
+      if (originalRequest.url?.includes('/auth/login') || 
+          originalRequest.url?.includes('/auth/refresh') ||
+          originalRequest.url?.includes('/auth/logout')) {
+        tokenManager.clearTokens();
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+        return Promise.reject(error);
+      }
+
       if (isRefreshing) {
         // Si un refresh est déjà en cours, mettre en queue
         return new Promise((resolve, reject) => {
@@ -96,27 +107,47 @@ api.interceptors.response.use(
       
       if (refreshToken) {
         try {
-          // Tentative de refresh du token
+          console.log('🔄 Tentative de refresh automatique...');
+          
+          // Utiliser l'endpoint exact de votre backend
           const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
-            refreshToken
+            refreshToken: refreshToken
           });
 
-          const { accessToken } = response.data;
-          tokenManager.setAccessToken(accessToken);
+          console.log('✅ Refresh automatique réussi');
+
+          const { accessToken, refreshToken: newRefreshToken } = response.data;
           
+          if (!accessToken) {
+            throw new Error('Access token manquant dans la réponse');
+          }
+
+          // Sauvegarder les nouveaux tokens
+          tokenManager.setAccessToken(accessToken);
+          if (newRefreshToken) {
+            tokenManager.setRefreshToken(newRefreshToken);
+          }
+          
+          // Mettre à jour l'en-tête de la requête originale
           if (originalRequest.headers) {
             originalRequest.headers.Authorization = `Bearer ${accessToken}`;
           }
 
+          // Traiter la queue des requêtes en attente
           processQueue(null, accessToken);
+          
+          // Relancer la requête originale
           return api(originalRequest);
           
-        } catch (refreshError) {
+        } catch (refreshError: any) {
+          console.error('❌ Erreur refresh automatique:', refreshError);
+          
           processQueue(refreshError, null);
           tokenManager.clearTokens();
           
-          // Rediriger vers login
+          // Rediriger vers login seulement si pas déjà dessus
           if (window.location.pathname !== '/login') {
+            console.log('🚪 Redirection vers login...');
             window.location.href = '/login';
           }
           
@@ -125,6 +156,8 @@ api.interceptors.response.use(
           isRefreshing = false;
         }
       } else {
+        console.log('🚫 Pas de refresh token, redirection vers login');
+        
         // Pas de refresh token, redirection vers login
         tokenManager.clearTokens();
         if (window.location.pathname !== '/login') {
