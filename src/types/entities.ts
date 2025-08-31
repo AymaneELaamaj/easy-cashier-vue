@@ -180,3 +180,79 @@ export interface ConfigPaiementResponse {
 export interface TypesDisponiblesResponse {
   typesDisponibles: { [key: string]: string };
 }
+// Ajoutez ces types à votre fichier types/entities.ts existant
+
+export interface SecurityAlert {
+  id: number;
+  alertType: string;
+  message: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  timestamp: string;
+  resolved: boolean;
+  resolvedAt?: string;
+  resolvedBy?: string;
+}
+
+export interface SecurityDashboard {
+  activeAlerts: SecurityAlert[];
+  totalAlerts: number;
+  criticalAlerts: number;
+  unresolvedAlerts: number;
+  lastUpdate: string;
+}
+
+export interface SecurityStats {
+  todayAlerts: number;
+  weekAlerts: number;
+  alertsByType: Record<string, number>;
+  alertsBySeverity: Record<string, number>;
+}
+
+export interface LogEntry {
+  timestamp: string;
+  thread: string;
+  level: string;
+  logger: string;
+  message: string;
+  rawLine: string;
+  userId?: number;
+  userEmail?: string;
+  eventType?: string;
+  alertType?: string;
+  severity?: string;
+}
+
+export interface SearchCriteria {
+  startDate?: string;
+  endDate?: string;
+  userId?: number;
+  userEmail?: string;
+  eventType?: string;
+  alertType?: string;
+  severity?: string;
+  keyword?: string;
+  logLevel?: string;
+  maxResults?: number;
+}
+
+export interface UserSession {
+  userId: number;
+  userEmail: string;
+  startTime: string;
+  endTime: string;
+  events: LogEntry[];
+  transactionCount: number;
+  alertCount: number;
+  suspiciousActivity: boolean;
+}
+
+export interface IncidentReport {
+  incidentId: string;
+  reportTime: string;
+  reportType: string;
+  criteria: SearchCriteria;
+  relatedLogs: LogEntry[];
+  involvedSessions: UserSession[];
+  statistics: Record<string, any>;
+  summary: string;
+}

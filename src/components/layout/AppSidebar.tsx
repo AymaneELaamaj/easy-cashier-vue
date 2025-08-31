@@ -14,6 +14,8 @@ import {
   MessageSquare,
   Monitor,
   UserCheck,
+  Shield,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -99,6 +101,22 @@ const menuItems = [
   }
 ];
 
+// Nouvelle section sécurité
+const securityMenuItems = [
+  {
+    title: 'Dashboard Sécurité',
+    url: '/security/dashboard',
+    icon: Shield,
+    roles: ['ADMIN', 'SUPER_ADMIN']
+  },
+  {
+    title: 'Alertes',
+    url: '/security/alerts',
+    icon: AlertTriangle,
+    roles: ['ADMIN', 'SUPER_ADMIN']
+  }
+];
+
 export function AppSidebar() {
   const location = useLocation();
   const { hasAnyRole, isLoadingUser, userError } = useAuthContext();
@@ -106,13 +124,21 @@ export function AppSidebar() {
   const currentPath = location.pathname;
 
   // Filtrer les éléments du menu selon les rôles
-  // En mode développement, afficher tous les éléments si l'utilisateur n'est pas chargé
   const filteredMenuItems = menuItems.filter(item => {
     try {
       return hasAnyRole(item.roles);
     } catch (error) {
       console.warn('Erreur lors de la vérification des rôles:', error);
-      // En mode développement, afficher tous les éléments
+      return process.env.NODE_ENV === 'development';
+    }
+  });
+
+  // Filtrer les éléments de sécurité selon les rôles
+  const filteredSecurityItems = securityMenuItems.filter(item => {
+    try {
+      return hasAnyRole(item.roles);
+    } catch (error) {
+      console.warn('Erreur lors de la vérification des rôles:', error);
       return process.env.NODE_ENV === 'development';
     }
   });
@@ -141,25 +167,52 @@ export function AppSidebar() {
 
       {/* Navigation scrollable */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
-        <div className="space-y-1">
-          <p className="text-xs font-medium text-muted-foreground mb-2 px-3">
-            Navigation
-          </p>
-          
-          <nav className="space-y-1">
-            {filteredMenuItems.map((item) => (
-              <NavLink
-                key={item.title}
-                to={item.url}
-                end
-                className={getNavClasses}
-                title={item.title}
-              >
-                <item.icon className="h-4 w-4 flex-shrink-0 mr-3" />
-                <span className="truncate">{item.title}</span>
-              </NavLink>
-            ))}
-          </nav>
+        <div className="space-y-6">
+          {/* Section principale */}
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground mb-2 px-3">
+              Navigation
+            </p>
+            
+            <nav className="space-y-1">
+              {filteredMenuItems.map((item) => (
+                <NavLink
+                  key={item.title}
+                  to={item.url}
+                  end
+                  className={getNavClasses}
+                  title={item.title}
+                >
+                  <item.icon className="h-4 w-4 flex-shrink-0 mr-3" />
+                  <span className="truncate">{item.title}</span>
+                </NavLink>
+              ))}
+            </nav>
+          </div>
+
+          {/* Section sécurité */}
+          {filteredSecurityItems.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground mb-2 px-3">
+                Sécurité
+              </p>
+              
+              <nav className="space-y-1">
+                {filteredSecurityItems.map((item) => (
+                  <NavLink
+                    key={item.title}
+                    to={item.url}
+                    end
+                    className={getNavClasses}
+                    title={item.title}
+                  >
+                    <item.icon className="h-4 w-4 flex-shrink-0 mr-3" />
+                    <span className="truncate">{item.title}</span>
+                  </NavLink>
+                ))}
+              </nav>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -9,7 +9,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/layout/ProtectedRoute";
 import AppLayout from "@/components/layout/AppLayout";
 
-// Pages
+// Pages existantes
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Users from "./pages/Users";
@@ -23,6 +23,10 @@ import Feedbacks from './pages/Feedbacks';
 import { Configuration } from "./pages/Configuration";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
+
+// Pages sécurité
+import SecurityDashboard from "./pages/SecurityDashboard";
+import Alerts from "./pages/Alerts";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -56,7 +60,7 @@ const AppRoutes = () => (
       </ProtectedRoute>
     } />
 
-    {/* Placeholder pour les autres pages */}
+    {/* Routes existantes */}
     <Route path="/articles" element={
       <ProtectedRoute requiredRoles={['ADMIN', 'SUPER_ADMIN', 'EMPLOYE']}>
         <AppLayout>
@@ -64,8 +68,6 @@ const AppRoutes = () => (
         </AppLayout>
       </ProtectedRoute>
     } />
-
-   
 
     <Route path="/users" element={
       <ProtectedRoute requiredRoles={['ADMIN', 'SUPER_ADMIN']}>
@@ -149,6 +151,23 @@ const AppRoutes = () => (
       <ProtectedRoute requiredRoles={['ADMIN', 'SUPER_ADMIN']}>
         <AppLayout>
           <CategorieEmployes />
+        </AppLayout>
+      </ProtectedRoute>
+    } />
+
+    {/* Routes Sécurité */}
+    <Route path="/security/dashboard" element={
+      <ProtectedRoute requiredRoles={['ADMIN', 'SUPER_ADMIN']}>
+        <AppLayout>
+          <SecurityDashboard />
+        </AppLayout>
+      </ProtectedRoute>
+    } />
+
+    <Route path="/security/alerts" element={
+      <ProtectedRoute requiredRoles={['ADMIN', 'SUPER_ADMIN']}>
+        <AppLayout>
+          <Alerts />
         </AppLayout>
       </ProtectedRoute>
     } />
