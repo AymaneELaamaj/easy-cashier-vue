@@ -1,4 +1,5 @@
 // DTOs des entités métier
+import { StatutRapport, TypeRapport } from './api';
 
 export interface UtilisateurResponse {
   id?: number;
@@ -114,15 +115,42 @@ export enum StatusRemboursement {
   REFUSE = 'REFUSE'
 }
 
+export interface RapportDetailDTO {
+  id?: number;
+  utilisateur?: UtilisateurResponse;
+  nombreTransactionsUtilisateur?: number;
+  montantTotalUtilisateur?: number;
+  partSalarialeUtilisateur?: number;
+  partPatronaleUtilisateur?: number;
+  articleLePlusAchete?: string;
+  frequenceUtilisation?: number;
+  moyenneParTransaction?: number;
+}
+
 export interface RapportDTO {
   id?: number;
-  nom: string;
-  description?: string;
-  dateGeneration: string;
-  periode: string;
-  donnees?: { [key: string]: unknown };
-  fichierPath?: string;
-  taille?: number;
+  numeroRapport?: string;
+  titre?: string;
+  typeRapport?: TypeRapport;
+  statut?: StatutRapport;
+  dateDebut?: string; // Format: YYYY-MM-DD
+  dateFin?: string;   // Format: YYYY-MM-DD
+  dateCreation?: string; // Format: ISO DateTime
+  dateEnvoi?: string;    // Format: ISO DateTime
+  
+  // Statistiques globales
+  nombreTransactions?: number;
+  montantTotalPeriode?: number;
+  totalPartSalariale?: number;
+  totalPartPatronale?: number;
+  nombreUtilisateurs?: number;
+  
+  // Métadonnées
+  cheminFichier?: string;
+  creePar?: UtilisateurResponse;
+  
+  // Détails par utilisateur
+  details?: RapportDetailDTO[];
 }
 
 export interface FeedbackDTO {

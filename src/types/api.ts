@@ -67,3 +67,43 @@ export enum StatutTransaction {
   ANNULE = 'ANNULE',
   ECHEC = 'ECHEC'
 }
+
+
+// Nouveaux enums pour les rapports
+export enum StatutRapport {
+  EN_COURS = 'EN_COURS',
+  TERMINE = 'TERMINE', 
+  ENVOYE = 'ENVOYE',
+  ERREUR = 'ERREUR',
+  ARCHIVE = 'ARCHIVE'
+}
+
+export enum TypeRapport {
+  MENSUEL = 'MENSUEL',
+  HEBDOMADAIRE = 'HEBDOMADAIRE',
+  ANNUEL = 'ANNUEL', 
+  PERSONNALISE = 'PERSONNALISE'
+}
+
+// Types pour l'affichage (optionnel)
+export const StatutRapportLabels: Record<StatutRapport, string> = {
+  [StatutRapport.EN_COURS]: 'En cours de génération',
+  [StatutRapport.TERMINE]: 'Terminé',
+  [StatutRapport.ENVOYE]: 'Envoyé',
+  [StatutRapport.ERREUR]: 'Erreur lors de la génération',
+  [StatutRapport.ARCHIVE]: 'Archivé'
+};
+
+export const TypeRapportLabels: Record<TypeRapport, string> = {
+  [TypeRapport.MENSUEL]: 'Rapport Mensuel',
+  [TypeRapport.HEBDOMADAIRE]: 'Rapport Hebdomadaire',
+  [TypeRapport.ANNUEL]: 'Rapport Annuel',
+  [TypeRapport.PERSONNALISE]: 'Rapport Personnalisé'
+};
+export interface RapportsApiResponse<T> {
+  timestamp: string;
+  status: number;
+  message: string;
+  items: T;
+  path: string;
+}

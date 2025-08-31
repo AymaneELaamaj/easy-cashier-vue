@@ -23,6 +23,8 @@ import Feedbacks from './pages/Feedbacks';
 import { Configuration } from "./pages/Configuration";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
+import RapportsPage from '@/pages/RapportsPage';
+// SUPPRIMÉ : import { useRapportManager } from '@/hooks/useRapports'; (pas besoin dans App.jsx)
 
 // Pages sécurité
 import SecurityDashboard from "./pages/SecurityDashboard";
@@ -109,13 +111,11 @@ const AppRoutes = () => (
       </ProtectedRoute>
     } />
 
+    {/* CORRIGÉ: Route rapports avec RapportsPage */}
     <Route path="/rapports" element={
       <ProtectedRoute requiredRoles={['ADMIN', 'SUPER_ADMIN']}>
         <AppLayout>
-          <div className="text-center py-8">
-            <h1 className="text-2xl font-bold mb-4">Rapports</h1>
-            <p className="text-muted-foreground">Page en cours de développement</p>
-          </div>
+          <RapportsPage />
         </AppLayout>
       </ProtectedRoute>
     } />
