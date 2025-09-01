@@ -4,46 +4,32 @@ import { LoginRequest, UtilisateurResponse } from '@/types/entities';
 
 export const authAPI = {
   // Connexion - alignée avec le backend
-  login: async (credentials: LoginRequest): Promise<UtilisateurResponse> => {
-    console.log('🔐 Tentative de connexion pour:', credentials.email);
-    
-    const response = await api.post<ApiResponse<UtilisateurResponse>>('/auth/login', credentials);
-    
-    console.log('✅ Réponse login reçue:', response.data);
-    
-    // Vérifier la structure de réponse de votre backend
-    const userData: UtilisateurResponse = response.data.data as UtilisateurResponse;
-    
-    // Votre backend retourne probablement les tokens dans la réponse
-    // Adapter selon la structure exacte de votre réponse
-    const accessToken = (userData as any)?.accessToken || 
-                       (response.data as any)?.accessToken ||
-                       (userData as any)?.token || 
-                       (response.data as any)?.token;
-
-    const refreshToken = (userData as any)?.refreshToken || 
-                        (response.data as any)?.refreshToken;
-    
-    // Fallback: vérifier les headers
-    const headerAccessToken = response.headers['authorization']?.replace('Bearer ', '') || 
-                             response.headers['x-access-token'];
-    const headerRefreshToken = response.headers['x-refresh-token'];
-    
-    // Sauvegarder les tokens
-    if (accessToken || headerAccessToken) {
-      const finalAccessToken = accessToken || headerAccessToken;
-      tokenManager.setAccessToken(finalAccessToken);
-      console.log('💾 Access token sauvegardé');
-    }
-    
-    if (refreshToken || headerRefreshToken) {
-      const finalRefreshToken = refreshToken || headerRefreshToken;
-      tokenManager.setRefreshToken(finalRefreshToken);
-      console.log('💾 Refresh token sauvegardé');
-    }
-    
-    return userData;
-  },
+login: async (credentials: LoginRequest): Promise<UtilisateurResponse> => {
+  console.log('🔐 Tentative de connexion pour:', credentials.email);
+  
+  const response = await api.post<any>('/auth/login', credentials);
+  
+  console.log('✅ Réponse login reçue:', response.data);
+  
+  // Votre backend retourne { data: {...}, token: "...", refreshToken: "..." }
+  const userData = response.data.data;
+  const accessToken = response.data.token; // Pas .accessToken
+  const refreshToken = response.data.refreshToken;
+  
+  // Sauvegarder les tokens
+  if (accessToken) {
+    tokenManager.setAccessToken(accessToken);
+    console.log('💾 Access token sauvegardé');
+  }
+  
+  if (refreshToken) {
+    tokenManager.setRefreshToken(refreshToken);
+    console.log('💾 Refresh token sauvegardé');
+  }
+  
+  return userData;
+}
+  ,
 
   // Refresh token - utilise l'endpoint backend exact
   refreshToken: async (): Promise<{ accessToken: string; refreshToken: string }> => {
