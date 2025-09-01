@@ -1,13 +1,13 @@
-import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { Toaster as HotToaster } from 'react-hot-toast';
+import { Toaster as HotToaster, Toaster } from 'react-hot-toast';
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/layout/ProtectedRoute";
 import AppLayout from "@/components/layout/AppLayout";
+import POSLayout from "@/components/layout/POSLayout";
 
 // Pages existantes
 import Login from "./pages/Login";
@@ -24,7 +24,7 @@ import { Configuration } from "./pages/Configuration";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
 import RapportsPage from '@/pages/RapportsPage';
-// SUPPRIMÉ : import { useRapportManager } from '@/hooks/useRapports'; (pas besoin dans App.jsx)
+import POSInterface from "./pages/POSInterface";
 
 // Pages sécurité
 import SecurityDashboard from "./pages/SecurityDashboard";
@@ -59,6 +59,15 @@ const AppRoutes = () => (
         <AppLayout>
           <Dashboard />
         </AppLayout>
+      </ProtectedRoute>
+    } />
+
+    {/* Route POS spéciale avec POSLayout */}
+    <Route path="/pos" element={
+      <ProtectedRoute requiredRoles={['CAISSIER', 'ADMIN', 'SUPER_ADMIN']}>
+        <POSLayout>
+          <POSInterface />
+        </POSLayout>
       </ProtectedRoute>
     } />
 
@@ -111,7 +120,6 @@ const AppRoutes = () => (
       </ProtectedRoute>
     } />
 
-    {/* CORRIGÉ: Route rapports avec RapportsPage */}
     <Route path="/rapports" element={
       <ProtectedRoute requiredRoles={['ADMIN', 'SUPER_ADMIN']}>
         <AppLayout>

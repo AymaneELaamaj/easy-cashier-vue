@@ -1,9 +1,10 @@
-// Types génériques pour les réponses API
+//srctypes/api.ts
 export interface ApiResponse<T> {
   data: T;
   success: boolean;
   message?: string;
   timestamp?: string;
+  status?: number;
 }
 
 // Interface spécifique pour les réponses paginées du backend
@@ -83,6 +84,24 @@ export enum TypeRapport {
   HEBDOMADAIRE = 'HEBDOMADAIRE',
   ANNUEL = 'ANNUEL', 
   PERSONNALISE = 'PERSONNALISE'
+}
+// Ajoutez ces types dans src/types/api.ts ou créez un nouveau fichier src/types/pos.ts
+
+export interface BadgeApiResponse<T> {
+  timestamp: string;
+  status: number;
+  message: string;
+  data: T;
+  path: string;
+}
+
+export interface PosApiError {
+  timestamp: string;
+  status: number;
+  error: string;
+  message: string;
+  details?: string[];
+  path: string;
 }
 
 // Types pour l'affichage (optionnel)

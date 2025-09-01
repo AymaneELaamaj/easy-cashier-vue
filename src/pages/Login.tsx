@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { LoginRequest } from '@/types/entities';
 import { Eye, EyeOff, LogIn } from 'lucide-react';
@@ -20,11 +19,17 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 export function Login() {
-  const { isAuthenticated, login, isLoggingIn } = useAuthContext();
+  const { isAuthenticated, login, isLoggingIn, currentUser } = useAuthContext();
   const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
 
-  const from = location.state?.from?.pathname || '/dashboard';
+  // Déterminer la redirection selon le rôle
+  const getRedirectPath = () => {
+    if (currentUser?.role === 'CAISSIER') {
+      return '/pos';
+    }
+    return location.state?.from?.pathname || '/dashboard';
+  };
 
   const {
     register,
@@ -37,7 +42,7 @@ export function Login() {
 
   // Rediriger si déjà authentifié
   if (isAuthenticated) {
-    return <Navigate to={from} replace />;
+    return <Navigate to={getRedirectPath()} replace />;
   }
 
   const onSubmit = async (data: LoginForm) => {
@@ -48,9 +53,10 @@ export function Login() {
       };
       
       await login(credentials);
+      // La redirection est maintenant gérée dans AuthContext
     } catch (error: any) {
       setError('root', {
-        message: error.response?.data?.message || 'Erreur de connexion'
+        message: error.response?.data?.message || error.message || 'Erreur de connexion'
       });
     }
   };
@@ -59,7 +65,7 @@ export function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/20 p-4">
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-1 text-center">
-          <div className="mx-auto w-12 h-12 bg-gradient-primary rounded-lg flex items-center justify-center mb-4">
+          <div className="mx-auto w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center mb-4">
             <span className="text-white font-bold text-lg">EP</span>
           </div>
           <CardTitle className="text-2xl font-bold">EasyPOS</CardTitle>
@@ -129,7 +135,7 @@ export function Login() {
             >
               {isLoggingIn ? (
                 <>
-                  <LoadingSpinner size="sm" className="mr-2" />
+                  <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
                   Connexion en cours...
                 </>
               ) : (

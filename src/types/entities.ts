@@ -1,4 +1,4 @@
-// DTOs des entités métier
+//src/types/entities.ts
 import { StatutRapport, TypeRapport } from './api';
 
 export interface UtilisateurResponse {
