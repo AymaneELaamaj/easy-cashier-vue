@@ -167,11 +167,16 @@ export interface RapportDTO {
   details?: RapportDetailDTO[];
 }
 
-export interface FeedbackDTO {
+export interface FeedbackResponse {
   id?: number;
   commentaire: string;
   utilisateurid?: number;
-  utilisateur?: UtilisateurResponse;
+  utilisateurNom?: string;
+  utilisateurPrenom?: string;
+}
+
+export interface FeedbackRequest {
+  commentaire: string;
 }
 
 export interface TerminalPOS {

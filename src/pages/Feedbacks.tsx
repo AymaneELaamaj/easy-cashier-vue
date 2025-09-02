@@ -1,139 +1,163 @@
-import { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import { Plus, Search, MessageSquare, User, Calendar, TrendingUp, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useFeedbacks } from '@/hooks/useFeedbacks';
 import { useAuth } from '@/hooks/useAuth';
-import { FeedbackDTO } from '@/types/entities';
-import { 
-  Search, 
-  Plus, 
-  MessageSquare, 
-  Users, 
-  User,
-  Calendar,
-  TrendingUp
-} from 'lucide-react';
-import {
-  CreateFeedbackModal,
-  EditFeedbackModal,
-  DeleteFeedbackModal,
-  FeedbackCard
-} from '@/components/feedbacks';
+import { useFeedbacks } from '@/hooks/useFeedbacks';
+import { FeedbackResponse } from '@/types/entities';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
-// Types locaux pour les statistiques
-interface FeedbackStats {
-  total: number;
-  myFeedbacks: number;
-  thisMonth: number;
-  avgLength: number;
-}
-
-export default function Feedbacks() {
+const Feedbacks: React.FC = () => {
+  const { currentUser, isAdmin, isEmploye, isAuthenticated } = useAuth();
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(12);
-  const [selectedFeedback, setSelectedFeedback] = useState<FeedbackDTO | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'all' | 'my'>('all');
+  const [selectedFeedback, setSelectedFeedback] = useState<FeedbackResponse | null>(null);
 
-  const { currentUser } = useAuth();
-  
+  // Utilisation du hook useFeedbacks
   const {
     feedbacks,
     myFeedbacks,
     isLoading,
     isLoadingMy,
-    isCreating,
-    isUpdating,
-    isDeleting,
     error,
     errorMy,
     createFeedback,
     updateFeedback,
     deleteFeedback,
+    isCreating,
+    isUpdating,
+    isDeleting,
     refetch,
-    refetchMy
-  } = useFeedbacks({ page, size: pageSize });
+    refetchMy,
+  } = useFeedbacks();
 
-  // Calcul des statistiques
-  const stats: FeedbackStats = useMemo(() => {
-    const allFeedbacksData = feedbacks?.content || [];
-    const myFeedbacksData = myFeedbacks?.content || [];
-    const currentMonth = new Date().getMonth();
+  // Logique selon les permissions : Admin voit tous les feedbacks, Employé voit les siens
+  const currentData = useMemo(() => {
+    if (isAdmin) {
+      return feedbacks?.content || [];
+    } else {
+      return myFeedbacks?.content || [];
+    }
+  }, [isAdmin, feedbacks?.content, myFeedbacks?.content]);
+  
+  const currentLoading = isAdmin ? isLoading : isLoadingMy;
+  const currentError = isAdmin ? error : errorMy;
+  const currentRefetch = isAdmin ? refetch : refetchMy;
+
+  // Recherche filtrée
+  const filteredData = useMemo(() => {
+    if (!currentData || !Array.isArray(currentData)) return [];
     
-    const thisMonthCount = allFeedbacksData.filter(feedback => {
-      // Approximation - vous pourriez avoir une date de création dans le DTO
-      return true; // Pour le moment, on compte tous les feedbacks
-    }).length;
+    return currentData.filter(feedback => 
+      feedback?.commentaire?.toLowerCase().includes(search.toLowerCase()) ||
+      (feedback?.utilisateurPrenom && feedback.utilisateurPrenom.toLowerCase().includes(search.toLowerCase())) ||
+      (feedback?.utilisateurNom && feedback.utilisateurNom.toLowerCase().includes(search.toLowerCase()))
+    );
+  }, [currentData, search]);
 
-    const avgLength = allFeedbacksData.length > 0
-      ? Math.round(allFeedbacksData.reduce((sum, f) => sum + f.commentaire.length, 0) / allFeedbacksData.length)
+  // Statistiques
+  const stats = useMemo(() => {
+    if (!currentData || !Array.isArray(currentData)) {
+      return { total: 0, myFeedbacks: 0, thisMonth: 0, avgLength: 0 };
+    }
+    
+    const total = currentData.length;
+    const myFeedbacksCount = isAdmin 
+      ? currentData.filter(f => f?.utilisateurid === currentUser?.id).length
+      : total;
+    
+    const thisMonth = currentData.filter(feedback => {
+      if (!feedback?.id) return false;
+      // Pas de date dans FeedbackResponse, on estime que c'est récent
+      return true; // Simulation pour l'instant
+    }).length;
+    
+    const avgLength = currentData.length 
+      ? Math.round(currentData.reduce((acc, f) => acc + (f?.commentaire?.length || 0), 0) / currentData.length)
       : 0;
 
-    return {
-      total: feedbacks?.totalElements || 0,
-      myFeedbacks: myFeedbacks?.totalElements || 0,
-      thisMonth: thisMonthCount,
-      avgLength
-    };
-  }, [feedbacks, myFeedbacks]);
+    return { total, myFeedbacks: myFeedbacksCount, thisMonth, avgLength };
+  }, [currentData, currentUser?.id, isAdmin]);
 
-  // Filtrage des données
-  const filteredData = useMemo(() => {
-    const data = activeTab === 'all' ? feedbacks?.content || [] : myFeedbacks?.content || [];
-    if (!search.trim()) return data;
-    
-    return data.filter(feedback =>
-      feedback.commentaire.toLowerCase().includes(search.toLowerCase()) ||
-      feedback.utilisateur?.nom?.toLowerCase().includes(search.toLowerCase()) ||
-      feedback.utilisateur?.prenom?.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [feedbacks, myFeedbacks, activeTab, search]);
-
-  // Handlers
+  // Gestion des actions
   const handleCreateFeedback = (commentaire: string) => {
     createFeedback(commentaire);
+    setShowCreateModal(false);
+    // Rafraîchir les données après création
+    setTimeout(() => {
+      currentRefetch();
+    }, 500);
   };
 
-  const handleEditFeedback = (feedback: FeedbackDTO) => {
+  const handleEditFeedback = (feedback: FeedbackResponse) => {
     setSelectedFeedback(feedback);
     setShowEditModal(true);
   };
 
   const handleUpdateFeedback = (id: number, commentaire: string) => {
     updateFeedback({ id, commentaire });
+    setShowEditModal(false);
+    setSelectedFeedback(null);
+    // Rafraîchir les données après modification
+    setTimeout(() => {
+      currentRefetch();
+    }, 500);
   };
 
-  const handleDeleteFeedback = (feedback: FeedbackDTO) => {
+  const handleDeleteFeedback = (feedback: FeedbackResponse) => {
     setSelectedFeedback(feedback);
     setShowDeleteModal(true);
   };
 
   const handleConfirmDelete = (id: number) => {
     deleteFeedback(id);
+    setShowDeleteModal(false);
+    setSelectedFeedback(null);
+    // Rafraîchir les données après suppression
+    setTimeout(() => {
+      currentRefetch();
+    }, 500);
   };
 
-  const canEditFeedback = (feedback: FeedbackDTO) => {
-    return currentUser?.id === feedback.utilisateurid || 
-           ['ADMIN', 'SUPER_ADMIN'].includes(currentUser?.role || '');
+  // Permissions
+  const canEditFeedback = (feedback: FeedbackResponse) => {
+    // Seulement les employés peuvent modifier leurs propres feedbacks
+    return isEmploye && currentUser?.id === feedback.utilisateurid;
   };
 
-  const canDeleteFeedback = (feedback: FeedbackDTO) => {
-    return currentUser?.id === feedback.utilisateurid || 
-           ['ADMIN', 'SUPER_ADMIN'].includes(currentUser?.role || '');
+  const canDeleteFeedback = (feedback: FeedbackResponse) => {
+    // Les employés peuvent supprimer leurs propres feedbacks, les admins peuvent supprimer tous les feedbacks
+    return (isEmploye && currentUser?.id === feedback.utilisateurid) || isAdmin;
   };
 
-  const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(currentUser?.role || '');
-  const canCreateFeedback = currentUser?.role === 'EMPLOYE' || isAdmin;
+  const canCreateFeedback = isEmploye; // Seulement les employés peuvent créer des feedbacks
 
-  const currentIsLoading = activeTab === 'all' ? isLoading : isLoadingMy;
-  const currentError = activeTab === 'all' ? error : errorMy;
+  if (currentLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
+  if (currentError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full space-y-4">
+        <div className="text-destructive text-lg font-semibold">
+          Erreur lors du chargement des feedbacks
+        </div>
+        <div className="text-muted-foreground text-center max-w-md">
+          {currentError?.message || 'Une erreur est survenue'}
+        </div>
+        <Button onClick={() => currentRefetch()} variant="outline">
+          Réessayer
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -142,7 +166,7 @@ export default function Feedbacks() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Feedbacks</h1>
           <p className="text-muted-foreground">
-            Gestion des commentaires et suggestions
+            {isAdmin ? "Gestion de tous les commentaires et suggestions" : "Gestion de vos commentaires et suggestions"}
           </p>
         </div>
         {canCreateFeedback && (
@@ -161,29 +185,33 @@ export default function Feedbacks() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Feedbacks</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {isAdmin ? 'Total Feedbacks' : 'Mes Feedbacks'}
+            </CardTitle>
             <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
             <p className="text-xs text-muted-foreground">
-              Tous les feedbacks
+              {isAdmin ? 'Tous les feedbacks' : 'Feedbacks créés'}
             </p>
           </CardContent>
         </Card>
         
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Mes Feedbacks</CardTitle>
-            <User className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.myFeedbacks}</div>
-            <p className="text-xs text-muted-foreground">
-              Feedbacks que j'ai créés
-            </p>
-          </CardContent>
-        </Card>
+        {!isAdmin && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Mes Contributions</CardTitle>
+              <User className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.myFeedbacks}</div>
+              <p className="text-xs text-muted-foreground">
+                Mes feedbacks
+              </p>
+            </CardContent>
+          </Card>
+        )}
         
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -212,7 +240,7 @@ export default function Feedbacks() {
         </Card>
       </div>
 
-      {/* Barre de recherche et filtres */}
+      {/* Barre de recherche */}
       <Card>
         <CardHeader>
           <CardTitle>Rechercher</CardTitle>
@@ -233,161 +261,217 @@ export default function Feedbacks() {
         </CardContent>
       </Card>
 
-      {/* Onglets et contenu */}
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'all' | 'my')}>
-        <TabsList>
-          {isAdmin && (
-            <TabsTrigger value="all" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Tous les feedbacks
-              <Badge variant="secondary">{stats.total}</Badge>
-            </TabsTrigger>
-          )}
-          <TabsTrigger value="my" className="flex items-center gap-2">
-            <User className="h-4 w-4" />
-            Mes feedbacks
-            <Badge variant="secondary">{stats.myFeedbacks}</Badge>
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="all" className="mt-6">
-          {currentIsLoading ? (
-            <div className="flex justify-center items-center h-64">
-              <LoadingSpinner size="lg" />
+      {/* Liste des feedbacks */}
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            {isAdmin ? 'Tous les Feedbacks' : 'Mes Feedbacks'}
+          </CardTitle>
+          <CardDescription>
+            {isAdmin 
+              ? 'Gérez tous les feedbacks de vos employés'
+              : 'Consultez et gérez vos propres feedbacks'
+            }
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {filteredData.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <MessageSquare className="h-16 w-16 text-muted-foreground/30" />
+              <div className="text-center">
+                <h3 className="text-lg font-medium text-muted-foreground">
+                  Aucun feedback trouvé
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {search ? 'Essayez de modifier votre recherche' : 'Commencez par créer votre premier feedback'}
+                </p>
+              </div>
             </div>
-          ) : currentError ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center h-64">
-                <MessageSquare className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground text-center">
-                  Erreur lors du chargement des feedbacks
-                </p>
-                <Button 
-                  variant="outline" 
-                  onClick={() => activeTab === 'all' ? refetch() : refetchMy()}
-                  className="mt-4"
-                >
-                  Réessayer
-                </Button>
-              </CardContent>
-            </Card>
-          ) : filteredData.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center h-64">
-                <MessageSquare className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground text-center">
-                  {search ? 'Aucun feedback trouvé' : 'Aucun feedback disponible'}
-                </p>
-                {canCreateFeedback && !search && (
-                  <Button 
-                    onClick={() => setShowCreateModal(true)}
-                    className="mt-4"
-                  >
-                    Créer le premier feedback
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {filteredData.map((feedback) => (
-                <FeedbackCard
-                  key={feedback.id}
-                  feedback={feedback}
-                  canEdit={canEditFeedback(feedback)}
-                  canDelete={canDeleteFeedback(feedback)}
-                  onEdit={handleEditFeedback}
-                  onDelete={handleDeleteFeedback}
-                />
+                <Card key={feedback.id} className="p-4">
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm text-gray-600 line-clamp-3">
+                        {feedback.commentaire}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <div>
+                        {feedback.utilisateurNom && feedback.utilisateurPrenom && (
+                          <span>{feedback.utilisateurPrenom} {feedback.utilisateurNom}</span>
+                        )}
+                      </div>
+                      <div className="flex space-x-1">
+                        {canEditFeedback(feedback) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditFeedback(feedback)}
+                            disabled={isUpdating}
+                            className="h-7 w-7 p-0"
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                        )}
+                        {canDeleteFeedback(feedback) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteFeedback(feedback)}
+                            disabled={isDeleting}
+                            className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
               ))}
             </div>
           )}
-        </TabsContent>
+        </CardContent>
+      </Card>
 
-        <TabsContent value="my" className="mt-6">
-          {currentIsLoading ? (
-            <div className="flex justify-center items-center h-64">
-              <LoadingSpinner size="lg" />
-            </div>
-          ) : currentError ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center h-64">
-                <MessageSquare className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground text-center">
-                  Erreur lors du chargement de vos feedbacks
+      {/* Modal de création */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle>Nouveau Feedback</CardTitle>
+              <CardDescription>Partagez vos commentaires et suggestions</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                const commentaire = formData.get('commentaire') as string;
+                if (commentaire.trim()) {
+                  handleCreateFeedback(commentaire);
+                }
+              }}>
+                <textarea
+                  name="commentaire"
+                  placeholder="Votre commentaire..."
+                  className="w-full p-3 border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={4}
+                  required
+                />
+                <div className="flex justify-end space-x-2 mt-4">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setShowCreateModal(false)}
+                    disabled={isCreating}
+                  >
+                    Annuler
+                  </Button>
+                  <Button type="submit" disabled={isCreating}>
+                    {isCreating ? 'Création...' : 'Créer'}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal de modification */}
+      {showEditModal && selectedFeedback && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle>Modifier Feedback</CardTitle>
+              <CardDescription>Modifiez votre commentaire</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                const commentaire = formData.get('commentaire') as string;
+                if (commentaire.trim() && selectedFeedback.id) {
+                  handleUpdateFeedback(selectedFeedback.id, commentaire);
+                }
+              }}>
+                <textarea
+                  name="commentaire"
+                  defaultValue={selectedFeedback.commentaire}
+                  placeholder="Votre commentaire..."
+                  className="w-full p-3 border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={4}
+                  required
+                />
+                <div className="flex justify-end space-x-2 mt-4">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      setShowEditModal(false);
+                      setSelectedFeedback(null);
+                    }}
+                    disabled={isUpdating}
+                  >
+                    Annuler
+                  </Button>
+                  <Button type="submit" disabled={isUpdating}>
+                    {isUpdating ? 'Mise à jour...' : 'Modifier'}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal de suppression */}
+      {showDeleteModal && selectedFeedback && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle>Supprimer Feedback</CardTitle>
+              <CardDescription>Cette action est irréversible</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-4">
+                Êtes-vous sûr de vouloir supprimer ce feedback ?
+              </p>
+              <div className="bg-gray-50 p-3 rounded-md mb-4">
+                <p className="text-sm text-gray-600 line-clamp-2">
+                  {selectedFeedback.commentaire}
                 </p>
+              </div>
+              <div className="flex justify-end space-x-2">
                 <Button 
                   variant="outline" 
-                  onClick={() => refetchMy()}
-                  className="mt-4"
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setSelectedFeedback(null);
+                  }}
+                  disabled={isDeleting}
                 >
-                  Réessayer
+                  Annuler
                 </Button>
-              </CardContent>
-            </Card>
-          ) : filteredData.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center h-64">
-                <MessageSquare className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground text-center">
-                  {search ? 'Aucun feedback trouvé' : 'Vous n\'avez pas encore créé de feedback'}
-                </p>
-                {canCreateFeedback && !search && (
-                  <Button 
-                    onClick={() => setShowCreateModal(true)}
-                    className="mt-4"
-                  >
-                    Créer mon premier feedback
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredData.map((feedback) => (
-                <FeedbackCard
-                  key={feedback.id}
-                  feedback={feedback}
-                  canEdit={canEditFeedback(feedback)}
-                  canDelete={canDeleteFeedback(feedback)}
-                  onEdit={handleEditFeedback}
-                  onDelete={handleDeleteFeedback}
-                />
-              ))}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
-
-      {/* Modals */}
-      <CreateFeedbackModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onSubmit={handleCreateFeedback}
-        isLoading={isCreating}
-      />
-
-      <EditFeedbackModal
-        feedback={selectedFeedback}
-        isOpen={showEditModal}
-        onClose={() => {
-          setShowEditModal(false);
-          setSelectedFeedback(null);
-        }}
-        onSubmit={handleUpdateFeedback}
-        isLoading={isUpdating}
-      />
-
-      <DeleteFeedbackModal
-        feedback={selectedFeedback}
-        isOpen={showDeleteModal}
-        onClose={() => {
-          setShowDeleteModal(false);
-          setSelectedFeedback(null);
-        }}
-        onConfirm={handleConfirmDelete}
-        isLoading={isDeleting}
-      />
+                <Button 
+                  variant="destructive" 
+                  onClick={() => {
+                    if (selectedFeedback.id) {
+                      handleConfirmDelete(selectedFeedback.id);
+                    }
+                  }} 
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? 'Suppression...' : 'Supprimer'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
+
+export default Feedbacks;

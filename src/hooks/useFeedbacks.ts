@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { feedbackAPI } from '@/services/api/feedback.api';
-import { FeedbackDTO } from '@/types/entities';
-import { Pageable } from '@/types/api';
+import { FeedbackResponse } from '@/types/entities';
+import { Pageable, Page } from '@/types/api';
 import toast from 'react-hot-toast';
 import { useState } from 'react';
+import { useAuth } from './useAuth';
 
 interface UseFeedbacksOptions {
   page?: number;
@@ -14,6 +15,7 @@ interface UseFeedbacksOptions {
 export const useFeedbacks = (options: UseFeedbacksOptions = {}) => {
   const queryClient = useQueryClient();
   const [isCreating, setIsCreating] = useState(false);
+  const { isAdmin, isAuthenticated } = useAuth();
 
   const pageable: Pageable = {
     page: options.page || 0,
@@ -21,28 +23,64 @@ export const useFeedbacks = (options: UseFeedbacksOptions = {}) => {
     sort: options.sort
   };
 
-  // Query pour récupérer tous les feedbacks (Admin)
+  // Valeur par défaut pour éviter undefined
+  const defaultPage: Page<FeedbackResponse> = {
+    content: [],
+    totalElements: 0,
+    totalPages: 0,
+    size: 10,
+    number: 0,
+    first: true,
+    last: true,
+    empty: true
+  };
+
+  // Query pour récupérer tous les feedbacks (Admin/Super Admin uniquement)
   const {
-    data: feedbacks,
+    data: feedbacks = defaultPage,
     isLoading,
     error,
     refetch
   } = useQuery({
     queryKey: ['feedbacks', 'all', pageable],
-    queryFn: () => feedbackAPI.getAllFeedbacks(pageable),
-    retry: 2
+    queryFn: async () => {
+      if (!isAuthenticated || !isAdmin) {
+        return defaultPage;
+      }
+      try {
+        const result = await feedbackAPI.getAllFeedbacks(pageable);
+        return result || defaultPage;
+      } catch (error) {
+        console.error('Erreur getAllFeedbacks:', error);
+        return defaultPage;
+      }
+    },
+    retry: 2,
+    enabled: isAuthenticated,
   });
 
-  // Query pour récupérer mes feedbacks
+  // Query pour récupérer mes feedbacks (Employé uniquement)
   const {
-    data: myFeedbacks,
+    data: myFeedbacks = defaultPage,
     isLoading: isLoadingMy,
     error: errorMy,
     refetch: refetchMy
   } = useQuery({
     queryKey: ['feedbacks', 'my', pageable],
-    queryFn: () => feedbackAPI.getMyFeedbacks(pageable),
-    retry: 2
+    queryFn: async () => {
+      if (!isAuthenticated || isAdmin) {
+        return defaultPage;
+      }
+      try {
+        const result = await feedbackAPI.getMyFeedbacks(pageable);
+        return result || defaultPage;
+      } catch (error) {
+        console.error('Erreur getMyFeedbacks:', error);
+        return defaultPage;
+      }
+    },
+    retry: 2,
+    enabled: isAuthenticated,
   });
 
   // Hook pour récupérer un feedback par ID (à utiliser séparément)
