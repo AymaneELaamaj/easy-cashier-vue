@@ -6,30 +6,34 @@ import { Badge } from '@/components/ui/badge';
 import { DataTable } from '@/components/ui/DataTable';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useRemboursements } from '@/hooks/useRemboursements';
-import { RemboursementDTO, StatusRemboursement } from '@/types/entities';
-import { Search, Plus, CreditCard, Clock, CheckCircle, XCircle, DollarSign } from 'lucide-react';
-import { CreateRemboursementModal } from '../components/remboursements/CreateRemboursementModal';
-import { UpdateStatusModal } from '../components/remboursements/UpdateStatusModal';
+import { useAuth } from '@/hooks/useAuth';
+import { RemboursementResponseDTO, StatusRemboursement } from '@/types/entities';
+import { 
+  Search, 
+  Plus, 
+  Clock, 
+  CheckCircle, 
+  XCircle, 
+  DollarSign, 
+  FileText,
+  Users,
+  AlertTriangle
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-
-// Types locaux pour les statistiques
-interface RemboursementStats {
-  total: number;
-  enAttente: number;
-  accepte: number;
-  refuse: number;
-  montantTotal: number;
-}
+import { CreateRemboursementModal } from '@/components/remboursements/CreateRemboursementModal';
 
 export default function Remboursements() {
+  // Récupération de l'utilisateur connecté pour déterminer les permissions
+  const { currentUser } = useAuth();
+  const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN';
+  const isEmploye = currentUser?.role === 'EMPLOYE';
+
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
-  const [selectedRemboursement, setSelectedRemboursement] = useState<RemboursementDTO | null>(null);
+  const [selectedRemboursement, setSelectedRemboursement] = useState<RemboursementResponseDTO | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'all' | 'my'>('all');
 
   const {
     remboursements,
@@ -45,13 +49,17 @@ export default function Remboursements() {
     refetchMy
   } = useRemboursements({ page, size: pageSize });
 
-  // Debug: Log des données
-  console.log('Remboursements data:', { remboursements, myRemboursements, isLoading, isLoadingMy, error });
+  // Gestion des données selon le rôle
+  const currentData = useMemo(() => {
+    if (isAdmin) {
+      return remboursements; // Les admins voient toujours toutes les demandes
+    }
+    return myRemboursements; // Les employés voient leurs propres demandes
+  }, [remboursements, myRemboursements, isAdmin]);
 
-  // Gestion des données selon l'onglet actif
-  const currentData = activeTab === 'all' ? remboursements : myRemboursements;
-  const currentLoading = activeTab === 'all' ? isLoading : isLoadingMy;
-  const currentRefetch = activeTab === 'all' ? refetch : refetchMy;
+  // Gestion des états de chargement selon le rôle
+  const currentLoading = isAdmin ? isLoading : isLoadingMy;
+  const currentRefetch = isAdmin ? refetch : refetchMy;
 
   const remboursementsContent = useMemo(() => 
     currentData?.content || [], [currentData?.content]
@@ -83,11 +91,12 @@ export default function Remboursements() {
     }
   };
 
-  const handleStatusChange = (remboursement: RemboursementDTO, newStatus: StatusRemboursement) => {
+  const handleStatusChange = (remboursement: RemboursementResponseDTO, newStatus: StatusRemboursement) => {
+    if (!isAdmin) return;
     updateStatus({ remboursementId: remboursement.id!, status: newStatus });
   };
 
-  const handleDelete = (remboursement: RemboursementDTO) => {
+  const handleDelete = (remboursement: RemboursementResponseDTO) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer ce remboursement ?')) {
       deleteRemboursement(remboursement.id!);
     }
@@ -97,14 +106,14 @@ export default function Remboursements() {
     {
       key: 'numeroTicket',
       header: 'N° Ticket',
-      render: (_: string, remb: RemboursementDTO) => (
+      render: (_: string, remb: RemboursementResponseDTO) => (
         <div className="font-medium">{remb.numeroTicket || '-'}</div>
       ),
     },
     {
       key: 'montantRemboursement',
       header: 'Montant',
-      render: (_: number, remb: RemboursementDTO) => (
+      render: (_: number, remb: RemboursementResponseDTO) => (
         <div className="font-medium text-success">
           {remb.montantRemboursement.toLocaleString('fr-FR', { 
             style: 'currency', 
@@ -116,7 +125,7 @@ export default function Remboursements() {
     {
       key: 'dateCreation',
       header: 'Date Demande',
-      render: (_: string, remb: RemboursementDTO) => (
+      render: (_: string, remb: RemboursementResponseDTO) => (
         <div className="text-sm">
           {remb.dateCreation ? format(new Date(remb.dateCreation), 'dd/MM/yyyy HH:mm', { locale: fr }) : '-'}
         </div>
@@ -125,7 +134,7 @@ export default function Remboursements() {
     {
       key: 'message',
       header: 'Motif',
-      render: (_: string, remb: RemboursementDTO) => (
+      render: (_: string, remb: RemboursementResponseDTO) => (
         <div className="text-sm max-w-xs truncate" title={remb.message}>
           {remb.message || '-'}
         </div>
@@ -134,7 +143,7 @@ export default function Remboursements() {
     {
       key: 'status',
       header: 'Statut',
-      render: (_: StatusRemboursement, remb: RemboursementDTO) => (
+      render: (_: StatusRemboursement, remb: RemboursementResponseDTO) => (
         <Badge variant={getStatusColor(remb.status)} className="flex items-center gap-1">
           {getStatusIcon(remb.status)}
           {remb.status === StatusRemboursement.EN_ATTENTE ? 'En attente' :
@@ -146,7 +155,7 @@ export default function Remboursements() {
     {
       key: 'dateTraitement',
       header: 'Date Traitement',
-      render: (_: string, remb: RemboursementDTO) => (
+      render: (_: string, remb: RemboursementResponseDTO) => (
         <div className="text-sm">
           {remb.dateTraitement ? format(new Date(remb.dateTraitement), 'dd/MM/yyyy HH:mm', { locale: fr }) : '-'}
         </div>
@@ -155,10 +164,10 @@ export default function Remboursements() {
     {
       key: 'actions',
       header: 'Actions',
-      render: (_: unknown, remb: RemboursementDTO) => (
+      render: (_: unknown, remb: RemboursementResponseDTO) => (
         <div className="flex space-x-1">
-          {/* Boutons admin pour changer le statut */}
-          {activeTab === 'all' && remb.status === StatusRemboursement.EN_ATTENTE && (
+          {/* Boutons admin pour changer le statut - seulement pour les admins */}
+          {isAdmin && remb.status === StatusRemboursement.EN_ATTENTE && (
             <>
               <Button
                 variant="outline"
@@ -181,20 +190,31 @@ export default function Remboursements() {
             </>
           )}
           
-          {/* Bouton supprimer */}
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => handleDelete(remb)}
-            disabled={isDeleting}
-            className="h-7 px-2 text-xs"
-          >
-            Supprimer
-          </Button>
+          {/* Bouton supprimer - seulement pour les employés sur leurs propres demandes */}
+          {isEmploye && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => handleDelete(remb)}
+              disabled={isDeleting}
+              className="h-7 px-2 text-xs"
+            >
+              Supprimer
+            </Button>
+          )}
         </div>
       ),
     },
   ];
+
+  // Statistiques
+  const stats = useMemo(() => ({
+    total: remboursementsContent.length,
+    enAttente: remboursementsContent.filter(r => r.status === StatusRemboursement.EN_ATTENTE).length,
+    acceptes: remboursementsContent.filter(r => r.status === StatusRemboursement.ACCEPTE).length,
+    refuses: remboursementsContent.filter(r => r.status === StatusRemboursement.REFUSE).length,
+    montantTotal: remboursementsContent.reduce((sum, r) => sum + (r.montantRemboursement || 0), 0)
+  }), [remboursementsContent]);
 
   if (currentLoading) return <LoadingSpinner />;
 
@@ -205,197 +225,151 @@ export default function Remboursements() {
           Erreur lors du chargement des remboursements
         </div>
         <div className="text-muted-foreground text-center max-w-md">
-          {error.message || 'Une erreur inattendue s\'est produite'}
+          {error.message || 'Une erreur est survenue'}
         </div>
-        <Button onClick={() => currentRefetch()}>
+        <Button onClick={() => currentRefetch()} variant="outline">
           Réessayer
         </Button>
       </div>
     );
   }
 
-  // Statistiques
-  const stats = {
-    total: remboursementsContent.length,
-    enAttente: remboursementsContent.filter(r => r.status === StatusRemboursement.EN_ATTENTE).length,
-    acceptes: remboursementsContent.filter(r => r.status === StatusRemboursement.ACCEPTE).length,
-    refuses: remboursementsContent.filter(r => r.status === StatusRemboursement.REFUSE).length,
-    montantTotal: remboursementsContent.reduce((sum, r) => sum + (r.montantRemboursement || 0), 0)
-  };
-
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Remboursements</h1>
-          <p className="text-sm text-muted-foreground">
-            Gérez les demandes de remboursement du système.
+          <h1 className="text-3xl font-bold tracking-tight">Remboursements</h1>
+          <p className="text-muted-foreground">
+            {isAdmin ? "Gérez toutes les demandes de remboursement" : "Gérez vos demandes de remboursement"}
           </p>
         </div>
-        <div className="flex space-x-2">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => currentRefetch()}
-            disabled={currentLoading}
-          >
-            <Search className="h-4 w-4 mr-2" />
-            {currentLoading ? 'Chargement...' : 'Recharger'}
-          </Button>
-          <Button size="sm" onClick={() => setShowCreateModal(true)}>
+        {isEmploye && (
+          <Button onClick={() => setShowCreateModal(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Nouvelle Demande
           </Button>
-        </div>
+        )}
       </div>
 
-      {/* Onglets */}
-      <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-fit">
-        <Button
-          variant={activeTab === 'all' ? 'default' : 'ghost'}
-          size="sm"
-          onClick={() => setActiveTab('all')}
-        >
-          Tous les remboursements
-        </Button>
-        <Button
-          variant={activeTab === 'my' ? 'default' : 'ghost'}
-          size="sm"
-          onClick={() => setActiveTab('my')}
-        >
-          Mes demandes
-        </Button>
-      </div>
+      {/* Onglets - Seulement pour les admins, et seulement l'onglet "Toutes les demandes" */}
+      {isAdmin && (
+        <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-fit">
+          <Button
+            variant="default"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <Users className="h-4 w-4" />
+            Toutes les Demandes
+          </Button>
+        </div>
+      )}
 
       {/* KPI Cards */}
-      <div className="grid gap-3 grid-cols-5">
-        <Card className="py-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-3">
-            <CardTitle className="text-xs font-medium">Total</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="pb-3">
-            <div className="text-xl font-bold">{stats.total}</div>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.total}</div>
           </CardContent>
         </Card>
 
-        <Card className="py-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-3">
-            <CardTitle className="text-xs font-medium">En attente</CardTitle>
-            <Clock className="h-4 w-4 text-yellow-600" />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">En Attente</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-yellow-500" />
           </CardHeader>
-          <CardContent className="pb-3">
-            <div className="text-xl font-bold text-yellow-600">{stats.enAttente}</div>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-600">{stats.enAttente}</div>
           </CardContent>
         </Card>
 
-        <Card className="py-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-3">
-            <CardTitle className="text-xs font-medium">Acceptés</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Acceptés</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
-          <CardContent className="pb-3">
-            <div className="text-xl font-bold text-green-600">{stats.acceptes}</div>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{stats.acceptes}</div>
           </CardContent>
         </Card>
 
-        <Card className="py-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-3">
-            <CardTitle className="text-xs font-medium">Refusés</CardTitle>
-            <XCircle className="h-4 w-4 text-red-600" />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Refusés</CardTitle>
+            <XCircle className="h-4 w-4 text-red-500" />
           </CardHeader>
-          <CardContent className="pb-3">
-            <div className="text-xl font-bold text-red-600">{stats.refuses}</div>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{stats.refuses}</div>
           </CardContent>
         </Card>
 
-        <Card className="py-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-3">
-            <CardTitle className="text-xs font-medium">Montant Total</CardTitle>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Montant Total</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="pb-3">
-            <div className="text-xl font-bold">
-              {stats.montantTotal.toLocaleString('fr-FR', { style: 'currency', currency: 'MAD' })}
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {stats.montantTotal.toLocaleString('fr-FR', { 
+                style: 'currency', 
+                currency: 'MAD' 
+              })}
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Search */}
-      <div className="flex items-center">
-        <div className="relative w-80">
+      <div className="flex items-center space-x-2">
+        <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Rechercher des remboursements..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 h-9"
+            className="pl-8"
           />
         </div>
       </div>
 
       {/* Table */}
       <Card>
-        <CardHeader className="pb-3">
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle className="text-lg">
-                {activeTab === 'all' ? 'Tous les remboursements' : 'Mes demandes de remboursement'}
-              </CardTitle>
-              <CardDescription className="text-sm">
-                {activeTab === 'all' 
-                  ? 'Gérez toutes les demandes de remboursement du système.'
-                  : 'Consultez et gérez vos propres demandes de remboursement.'
-                }
-              </CardDescription>
-            </div>
-          </div>
+        <CardHeader>
+          <CardTitle>
+            {isAdmin ? 'Toutes les Demandes' : 'Mes Demandes'}
+          </CardTitle>
+          <CardDescription>
+            {isAdmin 
+              ? 'Gérez toutes les demandes de remboursement de vos employés'
+              : 'Consultez et gérez vos propres demandes de remboursement'
+            }
+          </CardDescription>
         </CardHeader>
-        <CardContent className="pb-4">
-          {remboursementsContent.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 space-y-4">
-              <CreditCard className="h-16 w-16 text-muted-foreground" />
-              <div className="text-lg font-semibold">Aucun remboursement trouvé</div>
-              <div className="text-muted-foreground text-center max-w-md">
-                {activeTab === 'all' 
-                  ? 'Aucune demande de remboursement n\'a été trouvée dans le système.'
-                  : 'Vous n\'avez encore aucune demande de remboursement.'
-                }
-              </div>
-              <Button onClick={() => setShowCreateModal(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Créer une demande
-              </Button>
-            </div>
-          ) : (
-            <DataTable
-              columns={columns}
-              data={filteredRemboursements}
-              pagination={{
-                page: page,
-                size: pageSize,
-                total: currentData?.totalElements || 0,
-                onPageChange: setPage,
-                onSizeChange: setPageSize,
-              }}
-              searchable={false}
-            />
-          )}
+        <CardContent>
+          <DataTable
+            columns={columns}
+            data={filteredRemboursements}
+            pagination={{
+              page,
+              size: pageSize,
+              total: currentData?.totalElements ?? 0,
+              onPageChange: setPage,
+              onSizeChange: setPageSize,
+            }}
+            searchable={false}
+          />
         </CardContent>
       </Card>
 
-      {/* Modals */}
+      {/* Modal de création */}
       <CreateRemboursementModal 
         open={showCreateModal} 
         onOpenChange={setShowCreateModal} 
-      />
-      
-      <UpdateStatusModal 
-        open={showStatusModal} 
-        onOpenChange={setShowStatusModal} 
-        remboursement={selectedRemboursement} 
       />
     </div>
   );

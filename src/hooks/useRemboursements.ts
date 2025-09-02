@@ -1,43 +1,45 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { remboursementsAPI } from '@/services/api/remboursements.api';
-import { RemboursementDTO, StatusRemboursement } from '@/types/entities';
+import { RemboursementRequestDTO, RemboursementResponseDTO, StatusRemboursement } from '@/types/entities';
 import { Page, Pageable } from '@/types/api';
 import { toast } from 'react-hot-toast';
+import useAuth from './useAuth';
 
 export function useRemboursements(pageable?: Pageable) {
   const queryClient = useQueryClient();
+  const { isAdmin, isAuthenticated } = useAuth();
 
-  // Lister tous les remboursements (Admin)
+  // Lister tous les remboursements (Admin seulement)
   const {
     data: remboursements,
     isLoading,
     error,
     refetch
-  } = useQuery<Page<RemboursementDTO>>({
+  } = useQuery<Page<RemboursementResponseDTO>>({
     queryKey: ['remboursements', pageable],
     queryFn: () => remboursementsAPI.getAllRemboursements(pageable),
     staleTime: 30 * 1000, // 30 secondes
     retry: 2,
-    enabled: true, // Toujours enabled pour le moment
+    enabled: isAuthenticated && isAdmin, // Seulement pour les admins
   });
 
-  // Mes remboursements (Employé/Admin)
+  // Mes remboursements (Employé seulement)
   const {
     data: myRemboursements,
     isLoading: isLoadingMy,
     refetch: refetchMy
-  } = useQuery<Page<RemboursementDTO>>({
+  } = useQuery<Page<RemboursementResponseDTO>>({
     queryKey: ['myRemboursements', pageable],
     queryFn: () => remboursementsAPI.getMyRemboursements(pageable),
     staleTime: 30 * 1000,
     retry: 2,
-    enabled: true, // Toujours enabled pour le moment
+    enabled: isAuthenticated && !isAdmin, // Seulement pour les employés (non-admin)
   });
 
   // Créer une demande de remboursement
   const createDemandeMutation = useMutation({
-    mutationFn: ({ transactionId, message }: { transactionId: number; message: string }) =>
-      remboursementsAPI.createDemandeRemboursement(transactionId, message),
+    mutationFn: (request: RemboursementRequestDTO) =>
+      remboursementsAPI.createDemandeRemboursement(request),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['remboursements'] });
       queryClient.invalidateQueries({ queryKey: ['myRemboursements'] });

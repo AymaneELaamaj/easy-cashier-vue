@@ -63,6 +63,12 @@ export const transactionsAPI = {
     const res = await api.post(`/transactions/${id}/annuler`, body);
     return unwrap<TransactionDTO>(res);
   },
+
+  // Récupérer les transactions sans remboursement de l'utilisateur actuel
+  getTransactionsRemboursementNull: async (): Promise<TransactionDTO[]> => {
+    const res = await api.get('/transactions/remboursement-null');
+    return unwrap<TransactionDTO[]>(res);
+  },
 };
 
 export default transactionsAPI;

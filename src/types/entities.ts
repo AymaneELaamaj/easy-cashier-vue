@@ -106,7 +106,12 @@ export interface SubventionDTO {
   categorieEmployesNom?: string;
 }
 
-export interface RemboursementDTO {
+export interface RemboursementRequestDTO {
+  message: string;
+  transactionId: number;
+}
+
+export interface RemboursementResponseDTO {
   id?: number;
   montantRemboursement: number;
   dateCreation?: string;
@@ -116,9 +121,6 @@ export interface RemboursementDTO {
   transactionId: number;
   numeroTicket?: string;
   utilisateurId: number;
-  utilisateur?: UtilisateurResponse;
-  commentaireAdmin?: string;
-  montant?: number; // Alias pour compatibilité
 }
 
 export enum StatusRemboursement {
