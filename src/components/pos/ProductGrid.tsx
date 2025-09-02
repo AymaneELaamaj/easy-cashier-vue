@@ -3,8 +3,9 @@ import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, ImageOff } from 'lucide-react';
 import { ArticleDTO } from '@/types/entities';
+import { articlesAPI } from '@/services/api/articles.api';
 
 interface ProductGridProps {
   articles: ArticleDTO[];
@@ -48,6 +49,37 @@ const ProductGrid: React.FC<ProductGridProps> = ({
     );
   }
 
+  const renderArticleImage = (article: ArticleDTO) => {
+    const imageUrl = articlesAPI.getImageUrl(article.imageUrl);
+    
+    if (imageUrl) {
+      return (
+        <img
+          src={imageUrl}
+          alt={article.nom}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            // En cas d'erreur de chargement, afficher l'image par défaut
+            const target = e.target as HTMLImageElement;
+            target.style.display = 'none';
+            target.nextElementSibling?.classList.remove('hidden');
+          }}
+        />
+      );
+    }
+    
+    return null;
+  };
+
+  const renderFallbackImage = (article: ArticleDTO) => {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
+        <ImageOff className="w-8 h-8 mb-2" />
+        <span className="text-xs text-center px-2">Aucune image</span>
+      </div>
+    );
+  };
+
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
       {articles.map((article) => (
@@ -57,14 +89,30 @@ const ProductGrid: React.FC<ProductGridProps> = ({
           onClick={() => onAddToCart(article)}
         >
           <CardContent className="p-4">
-            <div className="aspect-square bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg mb-3 flex items-center justify-center relative overflow-hidden">
-              {/* Image placeholder - vous pouvez ajouter une vraie image plus tard */}
-              <div className="text-4xl">🍽️</div>
-              <div className="absolute top-2 right-2">
-                <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
+            <div className="aspect-square bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg mb-3 relative overflow-hidden">
+              {/* Image de l'article */}
+              <div className="absolute inset-0">
+                {renderArticleImage(article)}
+                <div className={`${article.imageUrl ? 'hidden' : ''} absolute inset-0`}>
+                  {renderFallbackImage(article)}
+                </div>
+              </div>
+              
+              {/* Badge ID en overlay */}
+              <div className="absolute top-2 right-2 z-10">
+                <Badge variant="secondary" className="text-xs px-1.5 py-0.5 bg-white/80 backdrop-blur-sm">
                   #{article.id}
                 </Badge>
               </div>
+
+              {/* Indicateur de statut si pas disponible */}
+              {(!article.disponible || !article.status) && (
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                  <Badge variant="destructive" className="text-xs">
+                    {!article.status ? 'Inactif' : 'Indisponible'}
+                  </Badge>
+                </div>
+              )}
             </div>
             
             <h3 className="font-semibold text-sm mb-1 truncate" title={article.nom}>
@@ -83,7 +131,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({
             
             {/* Indicateurs de statut */}
             <div className="flex items-center gap-1 mb-2">
-              {article.disponible && (
+              {article.disponible && article.status && (
                 <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
                   Disponible
                 </Badge>

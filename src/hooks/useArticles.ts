@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { articlesAPI } from '@/services/api/articles.api';
-import { ArticleDTO } from '@/types/entities';
+import { ArticleDTO, CreateArticleRequest, UpdateArticleRequest } from '@/types/entities';
 import { Pageable } from '@/types/api';
 import toast from 'react-hot-toast';
 
@@ -9,14 +9,13 @@ export const useArticles = (pageable?: Pageable) => {
 
   // Query principale pour lister les articles
   const articlesQuery = useQuery({
-    queryKey: ['articles'], // Clé simplifiée sans pageable
+    queryKey: ['articles'],
     queryFn: async () => {
       console.log('🚀 Déclenchement de la requête getAllArticles...');
       try {
         const result = await articlesAPI.getAllArticles(pageable);
         console.log('📡 Résultat de l\'API:', result);
         
-        // S'assurer que le résultat est toujours valide
         if (!result) {
           console.warn('API returned null/undefined, using fallback');
           return {
@@ -33,7 +32,6 @@ export const useArticles = (pageable?: Pageable) => {
           };
         }
         
-        // Vérifier que content existe, sinon utiliser un fallback
         if (!Array.isArray(result.content)) {
           console.warn('API content is not an array, using fallback');
           return {
@@ -49,7 +47,6 @@ export const useArticles = (pageable?: Pageable) => {
         return result;
       } catch (error) {
         console.error('❌ Erreur dans useArticles:', error);
-        // Retourner un objet valide même en cas d'erreur
         return {
           content: [],
           totalElements: 0,
@@ -64,29 +61,34 @@ export const useArticles = (pageable?: Pageable) => {
         };
       }
     },
-    staleTime: 0, // Pas de cache pour forcer le rechargement
-    retry: 3, // Réessayer 3 fois en cas d'échec
-    refetchOnMount: true, // Forcer le refetch au montage
-    refetchOnWindowFocus: true, // Refetch quand la fenêtre reprend le focus
+    staleTime: 0,
+    retry: 3,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
-  // Mutation pour créer un article
+  // ✅ MODIFIÉ : Mutation pour créer un article (avec support d'image)
   const createArticleMutation = useMutation({
-    mutationFn: articlesAPI.createArticle,
+    mutationFn: (newArticle: ArticleDTO | CreateArticleRequest) => {
+      // Nouveau format avec image
+      if ('article' in newArticle) {
+        return articlesAPI.createArticle(newArticle);
+      }
+      // Ancien format (rétrocompatibilité)
+      return articlesAPI.createArticle(newArticle);
+    },
     onMutate: async (newArticle) => {
-      // Annuler les requêtes en cours avec la clé exacte
       await queryClient.cancelQueries({ queryKey: ['articles'] });
       
-      // Snapshot de l'ancienne valeur
       const previousArticles = queryClient.getQueryData(['articles']);
       
-      // Mise à jour optimiste SEULEMENT si on a déjà des données
       if (previousArticles && Array.isArray((previousArticles as any)?.content)) {
+        const articleData = 'article' in newArticle ? newArticle.article : newArticle;
         queryClient.setQueryData(['articles'], (old: any) => {
           if (!old || !Array.isArray(old.content)) return old;
           return {
             ...old,
-            content: [newArticle, ...old.content],
+            content: [articleData, ...old.content],
             totalElements: (old.totalElements || 0) + 1,
             numberOfElements: (old.numberOfElements || 0) + 1
           };
@@ -98,26 +100,15 @@ export const useArticles = (pageable?: Pageable) => {
     onSuccess: async (newArticle) => {
       console.log('✅ Article créé avec succès:', newArticle);
       
-      // Forcer un refetch immédiat de la query active
-      const activeQuery = queryClient.getQueryState(['articles']);
-      console.log('🔍 État de la query active:', activeQuery);
-      
-      // Invalider le cache pour forcer un refetch
       await queryClient.invalidateQueries({ queryKey: ['articles'] });
-      console.log('🔄 Cache invalidé');
-      
-      // Forcer un refetch pour obtenir les données fraîches du backend
       await queryClient.refetchQueries({ queryKey: ['articles'] });
-      console.log('🔄 Refetch effectué');
       
-      // Vérifier que les données sont mises à jour
       const updatedData = queryClient.getQueryData(['articles']);
       console.log('🔍 Données après refetch:', updatedData);
       
       toast.success(`Article "${newArticle.nom}" créé avec succès`);
     },
     onError: (error: any, newArticle, context: any) => {
-      // Restaurer l'ancienne valeur en cas d'erreur
       if (context?.previousArticles) {
         queryClient.setQueryData(['articles'], context.previousArticles);
       }
@@ -126,12 +117,17 @@ export const useArticles = (pageable?: Pageable) => {
     }
   });
 
-  // Mutation pour mettre à jour un article
+  // ✅ MODIFIÉ : Mutation pour mettre à jour un article (avec support d'image)
   const updateArticleMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: ArticleDTO }) => 
-      articlesAPI.updateArticle(id, data),
+    mutationFn: ({ id, data }: { id: number; data: ArticleDTO | UpdateArticleRequest }) => {
+      // Nouveau format avec image
+      if ('article' in data) {
+        return articlesAPI.updateArticle(id, data);
+      }
+      // Ancien format (rétrocompatibilité)
+      return articlesAPI.updateArticle(id, data);
+    },
     onSuccess: async (updatedArticle) => {
-      // Invalider le cache et forcer un refetch immédiat
       await queryClient.invalidateQueries({ queryKey: ['articles'] });
       await queryClient.refetchQueries({ queryKey: ['articles'] });
       queryClient.invalidateQueries({ queryKey: ['article', updatedArticle.id] });
@@ -147,7 +143,6 @@ export const useArticles = (pageable?: Pageable) => {
   const deleteArticleMutation = useMutation({
     mutationFn: articlesAPI.deleteArticle,
     onSuccess: async () => {
-      // Invalider le cache et forcer un refetch immédiat
       await queryClient.invalidateQueries({ queryKey: ['articles'] });
       await queryClient.refetchQueries({ queryKey: ['articles'] });
       toast.success('Article supprimé avec succès');
@@ -173,7 +168,7 @@ export const useArticles = (pageable?: Pageable) => {
   };
 
   return {
-    // Données avec fallback sécurisé - jamais undefined
+    // Données avec fallback sécurisé
     articles: articlesQuery.data || defaultPage,
     isLoading: articlesQuery.isLoading,
     error: articlesQuery.error,

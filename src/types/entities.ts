@@ -31,6 +31,7 @@ export interface UtilisateurRequest {
   isActive?: boolean;
 }
 
+// ✅ MODIFICATION : Ajout du champ imageUrl
 export interface ArticleDTO {
   id?: number;
   nom: string;
@@ -41,9 +42,20 @@ export interface ArticleDTO {
   quantite?: number;
   disponible: boolean;
   status: boolean;
-  
+  imageUrl?: string; // 🆕 Nouveau champ pour l'image
 }
 
+// 🆕 NOUVEAU : Interface pour les données de création d'article avec image
+export interface CreateArticleRequest {
+  article: Omit<ArticleDTO, 'id' | 'imageUrl'>;
+  image?: File;
+}
+
+// 🆕 NOUVEAU : Interface pour les données de mise à jour d'article avec image
+export interface UpdateArticleRequest {
+  article: ArticleDTO;
+  image?: File;
+}
 
 export interface CategorieEmployesResponse {
   id?: number;

@@ -10,12 +10,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   ShoppingCart, Scan, Trash2, Plus, Minus, User, CreditCard, 
   CheckCircle2, AlertCircle, Wifi, WifiOff, Clock, Search, 
-  RefreshCw, Receipt, Loader2
+  RefreshCw, Receipt, Loader2, ImageOff
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { usePOSArticles } from '@/hooks/usePOSArticles';
 import { usePOS } from '@/hooks/usePOS';
 import { ArticleDTO } from '@/types/entities';
+import { articlesAPI } from '@/services/api/articles.api';
 import toast from 'react-hot-toast';
 
 const POSInterface: React.FC = () => {
@@ -42,6 +43,43 @@ const POSInterface: React.FC = () => {
 
   // Hook toast shadcn/ui
   const { toast: uiToast } = useToast();
+
+  // 🆕 NOUVEAU : Fonction pour rendre l'image d'un article
+  const renderArticleImage = (article: ArticleDTO) => {
+    const imageUrl = articlesAPI.getImageUrl(article.imageUrl);
+    
+    if (imageUrl) {
+      return (
+        <img
+          src={imageUrl}
+          alt={article.nom}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            // En cas d'erreur de chargement, masquer l'image et afficher le fallback
+            const target = e.target as HTMLImageElement;
+            target.style.display = 'none';
+            const parent = target.parentElement;
+            const fallback = parent?.querySelector('.image-fallback') as HTMLElement;
+            if (fallback) {
+              fallback.classList.remove('hidden');
+            }
+          }}
+        />
+      );
+    }
+    
+    return null;
+  };
+
+  // 🆕 NOUVEAU : Fonction pour le fallback d'image
+  const renderImageFallback = (article: ArticleDTO) => {
+    return (
+      <div className={`image-fallback w-full h-full flex flex-col items-center justify-center text-gray-400 ${article.imageUrl ? 'hidden' : ''}`}>
+        <ImageOff className="w-8 h-8 mb-2" />
+        <span className="text-xs text-center px-2">Aucune image</span>
+      </div>
+    );
+  };
 
   // Timer pour l'heure
   useEffect(() => {
@@ -383,7 +421,7 @@ const POSInterface: React.FC = () => {
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
                       <>
-                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        <CheckCircle2 className="w-4 w-4 mr-2" />
                         Valider
                       </>
                     )}
@@ -418,7 +456,7 @@ const POSInterface: React.FC = () => {
           </Badge>
         </div>
 
-        {/* Grille produits */}
+        {/* 🆕 MODIFIÉ : Grille produits avec images */}
         <div className="grid grid-cols-4 xl:grid-cols-5 gap-4">
           {articlesLoading ? (
             Array.from({ length: 8 }).map((_, i) => (
@@ -449,14 +487,30 @@ const POSInterface: React.FC = () => {
                 onClick={() => handleAddToCart(article)}
               >
                 <CardContent className="p-4">
-                  <div className="aspect-square bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg mb-3 flex items-center justify-center relative overflow-hidden">
-                    <div className="text-4xl">🍽️</div>
-                    <div className="absolute top-2 right-2">
-                      <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
+                  <div className="aspect-square bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg mb-3 relative overflow-hidden">
+                    {/* ✅ MODIFIÉ : Utilisation des vraies images */}
+                    <div className="absolute inset-0">
+                      {renderArticleImage(article)}
+                      {renderImageFallback(article)}
+                    </div>
+                    
+                    {/* Badge ID en overlay */}
+                    <div className="absolute top-2 right-2 z-10">
+                      <Badge variant="secondary" className="text-xs px-1.5 py-0.5 bg-white/80 backdrop-blur-sm">
                         #{article.id}
                       </Badge>
                     </div>
+
+                    {/* Indicateur de statut si pas disponible */}
+                    {(!article.disponible || !article.status) && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
+                        <Badge variant="destructive" className="text-xs">
+                          {!article.status ? 'Inactif' : 'Indisponible'}
+                        </Badge>
+                      </div>
+                    )}
                   </div>
+                  
                   <h3 className="font-semibold text-sm mb-1 truncate" title={article.nom}>
                     {article.nom}
                   </h3>
@@ -680,9 +734,6 @@ const POSInterface: React.FC = () => {
               </div>
             </div>
 
-           
-           
-
             {currentUser && currentUser.solde < 0 && (
               <Alert className="border-amber-200 bg-amber-50">
                 <AlertCircle className="h-4 w-4 text-amber-600" />
@@ -703,7 +754,7 @@ const POSInterface: React.FC = () => {
             </Button>
             <Button 
               onClick={handleTransactionValidation}
-              disabled={isLoading }
+              disabled={isLoading}
               className="bg-blue-600 hover:bg-blue-700"
             >
               {isLoading ? (

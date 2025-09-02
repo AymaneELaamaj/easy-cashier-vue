@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,10 +12,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ArticleDTO } from '@/types/entities';
+import { ArticleDTO, UpdateArticleRequest } from '@/types/entities';
 import { useArticles } from '@/hooks/useArticles';
+import { articlesAPI } from '@/services/api/articles.api';
 import { toast } from 'react-hot-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Upload, X, ImageIcon, RefreshCw } from 'lucide-react';
 
 interface EditArticleModalProps {
   open: boolean;
@@ -25,6 +26,7 @@ interface EditArticleModalProps {
 
 export function EditArticleModal({ open, onOpenChange, article }: EditArticleModalProps) {
   const { updateArticle, isUpdating } = useArticles();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState<Partial<ArticleDTO>>({
     nom: '',
@@ -34,6 +36,11 @@ export function EditArticleModal({ open, onOpenChange, article }: EditArticleMod
     disponible: true,
     status: true,
   });
+
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
+  const [imageAction, setImageAction] = useState<'keep' | 'update' | 'remove'>('keep');
 
   // Mettre à jour le formulaire quand l'article change
   useEffect(() => {
@@ -48,6 +55,18 @@ export function EditArticleModal({ open, onOpenChange, article }: EditArticleMod
         codeOdoo: article.codeOdoo,
         productId: article.productId,
       });
+
+      // Gérer l'image existante
+      const imageUrl = articlesAPI.getImageUrl(article.imageUrl);
+      setCurrentImageUrl(imageUrl);
+      setImagePreview(null);
+      setSelectedImage(null);
+      setImageAction('keep');
+      
+      // Réinitialiser le file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   }, [article]);
 
@@ -56,6 +75,53 @@ export function EditArticleModal({ open, onOpenChange, article }: EditArticleMod
       ...prev,
       [field]: value
     }));
+  };
+
+  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validation du fichier
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+
+    if (file.size > maxSize) {
+      toast.error('L\'image ne doit pas dépasser 5MB');
+      return;
+    }
+
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Format d\'image non supporté. Utilisez JPG, PNG, GIF ou WebP');
+      return;
+    }
+
+    setSelectedImage(file);
+    setImageAction('update');
+
+    // Créer une preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImagePreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeCurrentImage = () => {
+    setImageAction('remove');
+    setImagePreview(null);
+    setSelectedImage(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const keepCurrentImage = () => {
+    setImageAction('keep');
+    setImagePreview(null);
+    setSelectedImage(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -67,7 +133,17 @@ export function EditArticleModal({ open, onOpenChange, article }: EditArticleMod
     }
  
     try {
-      await updateArticle({ id: article.id, data: formData as ArticleDTO });
+      const updateRequest: UpdateArticleRequest = {
+        article: { 
+          ...formData as ArticleDTO,
+          id: article.id,
+          // Si on supprime l'image, on met imageUrl à null
+          imageUrl: imageAction === 'remove' ? null : formData.imageUrl
+        },
+        image: imageAction === 'update' && selectedImage ? selectedImage : undefined
+      };
+
+      await updateArticle({ id: article.id, data: updateRequest });
       toast.success('Article mis à jour avec succès !');
       onOpenChange(false);
     } catch (error) {
@@ -77,11 +153,91 @@ export function EditArticleModal({ open, onOpenChange, article }: EditArticleMod
   };
 
   if (!article) return null;
-  console.log('DEBUG/article prop =>', article);
+
+  const renderImageSection = () => {
+    // Si on a sélectionné une nouvelle image
+    if (imageAction === 'update' && imagePreview) {
+      return (
+        <div className="relative">
+          <img
+            src={imagePreview}
+            alt="Nouvelle image"
+            className="w-full h-48 object-cover rounded-lg border"
+          />
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            className="absolute top-2 right-2"
+            onClick={keepCurrentImage}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+          <div className="absolute bottom-2 left-2">
+            <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded">
+              Nouvelle image
+            </span>
+          </div>
+        </div>
+      );
+    }
+
+    // Si on garde l'image actuelle
+    if (imageAction === 'keep' && currentImageUrl) {
+      return (
+        <div className="relative">
+          <img
+            src={currentImageUrl}
+            alt="Image actuelle"
+            className="w-full h-48 object-cover rounded-lg border"
+          />
+          <div className="absolute top-2 right-2 flex gap-2">
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={removeCurrentImage}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="absolute bottom-2 left-2">
+            <span className="bg-green-600 text-white text-xs px-2 py-1 rounded">
+              Image actuelle
+            </span>
+          </div>
+        </div>
+      );
+    }
+
+    // Si on a supprimé l'image ou s'il n'y en a pas
+    return (
+      <div 
+        className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-gray-400 transition-colors"
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+        <p className="text-sm text-gray-600 mb-2">
+          {imageAction === 'remove' ? 'Image supprimée - Cliquez pour en ajouter une nouvelle' : 'Cliquez pour ajouter une image'}
+        </p>
+        <p className="text-xs text-gray-500">
+          JPG, PNG, GIF, WebP - Max 5MB
+        </p>
+      </div>
+    );
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Modifier l'article</DialogTitle>
           <DialogDescription>
@@ -90,6 +246,46 @@ export function EditArticleModal({ open, onOpenChange, article }: EditArticleMod
         </DialogHeader> 
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Section Image */}
+          <div className="space-y-4 border rounded-lg p-4 bg-gray-50">
+            <div className="flex items-center gap-2">
+              <ImageIcon className="h-5 w-5" />
+              <Label className="font-medium">Image de l'article</Label>
+            </div>
+            
+            {renderImageSection()}
+            
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+
+            {currentImageUrl && imageAction !== 'remove' && (
+              <div className="flex gap-2 text-xs">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  Changer l'image
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={removeCurrentImage}
+                >
+                  Supprimer l'image
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Informations de base */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="nom">Nom *</Label>
@@ -140,8 +336,6 @@ export function EditArticleModal({ open, onOpenChange, article }: EditArticleMod
                 placeholder="0"
               />
             </div>
-
-            {/* Champ Code Odoo supprimé de l'édition */}
           </div>
 
           <div className="flex items-center justify-between space-x-4">
