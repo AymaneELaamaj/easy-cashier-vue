@@ -15,11 +15,21 @@ export function EditSubventionModal({
 }) {
   const { updateSubvention, isUpdating } = useSubventions();
 
-  const handleSubmit = async (values: SubventionFormValues) => {
-    if (!subvention?.id) return;
+ // Dans EditSubventionModal
+const handleSubmit = async (values: SubventionFormValues) => {
+  if (!subvention?.id) {
+    console.error('No subvention ID');
+    return;
+  }
+  
+  try {
     await updateSubvention({ id: subvention.id, data: values as any });
+    console.log('Update success');
     onClose();
-  };
+  } catch (error) {
+    console.error('Update error:', error);
+  }
+};
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>

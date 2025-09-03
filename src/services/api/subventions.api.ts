@@ -88,12 +88,12 @@ async function createSubvention(payload: SubventionDTO): Promise<SubventionDTO> 
 }
 
 async function updateSubvention(id: number, payload: SubventionDTO): Promise<SubventionDTO> {
-  const res = await api.put(`/subventions/update`, null, { params: { id }, data: payload });
+  const res = await api.put(`/subventions/update?id=${id}`, payload);
   return res?.data?.data ?? res?.data ?? payload;
 }
 
 async function deleteSubvention(id: number): Promise<void> {
-  await api.delete(`/subventions/delete`, { params: { id } });
+  await api.delete(`/subventions/delete?id=${id}`);
 }
 
 export const subventionsAPI = {

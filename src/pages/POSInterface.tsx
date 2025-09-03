@@ -614,15 +614,8 @@ console.log('Network Status:', networkStatus);
                 <span>Sous-total:</span>
                 <span className="font-semibold">{cartTotal.toFixed(2)} MAD</span>
               </div>
-              <div className="flex justify-between text-green-600">
-                <span>Subvention estimée:</span>
-                <span>-{estimatedSubvention.toFixed(2)} MAD</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between text-lg font-bold">
-                <span>À payer:</span>
-                <span className="text-blue-600">{estimatedToPay.toFixed(2)} MAD</span>
-              </div>
+            
+             
             </div>
 
             {/* Actions */}
