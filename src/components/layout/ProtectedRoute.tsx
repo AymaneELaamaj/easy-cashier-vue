@@ -9,6 +9,16 @@ interface ProtectedRouteProps {
   requireAuth?: boolean;
 }
 
+// Utilitaire pour détecter si on est offline
+const isOfflineMode = (): boolean => {
+  return !navigator.onLine;
+};
+
+// Utilitaire pour détecter si c'est l'interface POS
+const isPOSRoute = (pathname: string): boolean => {
+  return pathname === '/pos' || pathname.startsWith('/pos');
+};
+
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   requiredRoles = [],
@@ -26,7 +36,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // Vérifier l'authentification
+  //  Autoriser l'accès à POS en mode offline même sans auth
+  if (isPOSRoute(location.pathname) && isOfflineMode()) {
+    console.log('🏪 Mode offline détecté pour POS - accès autorisé sans auth');
+    return <>{children}</>;
+  }
+
+  // Vérifier l'authentification (seulement en ligne)
   if (requireAuth && !isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }

@@ -1,0 +1,23 @@
+{
+  "name": "EasyPos Cantine Management",
+  "short_name": "EasyPos",
+  "description": "Système de gestion de cantine d'entreprise",
+  "start_url": "/pos",
+  "display": "standalone",
+  "theme_color": "#1976d2",
+  "background_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/icons/computime.jpeg",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/easypos.jpg", 
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

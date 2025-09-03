@@ -18,8 +18,14 @@ import { usePOS } from '@/hooks/usePOS';
 import { ArticleDTO } from '@/types/entities';
 import { articlesAPI } from '@/services/api/articles.api';
 import toast from 'react-hot-toast';
+import useNetworkStatus from '@/hooks/useNetworkStatus';
+
 
 const POSInterface: React.FC = () => {
+  // Dans le composant
+const networkStatus = useNetworkStatus();
+
+console.log('Network Status:', networkStatus);
   // Hooks customs - Utilisation de usePOSArticles au lieu de useArticles
   const { articles, isLoading: articlesLoading, refetch: refetchArticles } = usePOSArticles();
   const { 
@@ -33,7 +39,6 @@ const POSInterface: React.FC = () => {
   const [badgeCode, setBadgeCode] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [isValidationModalOpen, setIsValidationModalOpen] = useState(false);
-  const [isOnline, setIsOnline] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [lastSync, setLastSync] = useState<Date>(new Date());
   const [lastTransaction, setLastTransaction] = useState<any>(null);
@@ -94,24 +99,7 @@ const POSInterface: React.FC = () => {
     }
   }, [currentUser]);
 
-  // Surveillance connexion
-  useEffect(() => {
-    const checkConnection = async () => {
-      try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/pos/health`, {
-          method: 'GET',
-          signal: AbortSignal.timeout(3000),
-        });
-        setIsOnline(response.ok);
-      } catch {
-        setIsOnline(false);
-      }
-    };
-
-    checkConnection();
-    const connectionTimer = setInterval(checkConnection, 15000);
-    return () => clearInterval(connectionTimer);
-  }, []);
+ 
 
   // Filtrage des articles avec vérification de sécurité
   useEffect(() => {
@@ -775,8 +763,8 @@ const POSInterface: React.FC = () => {
             <span>Dernière sync: {lastSync.toLocaleTimeString('fr-FR')}</span>
             <span>Articles: {articles.length}</span>
             <span>Panier: {cart.length}</span>
-            <Badge variant={isOnline ? "default" : "destructive"} className="text-xs">
-              {isOnline ? "EN LIGNE" : "HORS LIGNE"}
+            <Badge variant={networkStatus.isOnline ? "default" : "destructive"} className="text-xs">
+              {networkStatus.isOnline ? "EN LIGNE" : "HORS LIGNE"}
             </Badge>
           </div>
           <div className="flex items-center space-x-6">

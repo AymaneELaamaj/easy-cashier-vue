@@ -31,7 +31,13 @@ export const useAuth = () => {
       } catch (error) {
         console.error('❌ Erreur lors de la récupération de l\'utilisateur:', error);
         
-        // Si c'est une erreur d'authentification (401, 403), forcer la déconnexion
+        // MODIFIÉ : Vérifier si on est offline avant de forcer logout
+        if (!navigator.onLine) {
+          console.log('📴 Mode offline détecté - pas de déconnexion forcée');
+          throw error; // Laisser l'erreur se propager sans logout
+        }
+        
+        // Si c'est une erreur d'authentification (401, 403) ET qu'on est online
         if ((error as any)?.response?.status === 401 || (error as any)?.response?.status === 403) {
           console.log('🚨 Token invalide, déconnexion forcée');
           authAPI.forceLogout();
@@ -42,6 +48,12 @@ export const useAuth = () => {
     },
     enabled: hasTokens && !isLoggedOut, // Désactiver la query si pas de token ou si déconnecté
     retry: (failureCount, error) => {
+      // Ne pas retry si offline
+      if (!navigator.onLine) {
+        console.log('📴 Pas de retry en mode offline');
+        return false;
+      }
+      
       // Ne pas retry sur les erreurs d'auth
       if ((error as any)?.response?.status === 401 || (error as any)?.response?.status === 403) {
         return false;
@@ -130,15 +142,9 @@ export const useAuth = () => {
     }
   });
 
-  // Effet pour vérifier l'authentification au chargement
-  useEffect(() => {
-    // Vérifier si on est authentifié au chargement de l'application
-    const isAuth = authAPI.isAuthenticated();
-    if (!isAuth && !isLoggedOut && window.location.pathname !== '/login') {
-      console.log('🚪 Pas d\'authentification détectée, redirection vers login');
-      navigate('/login', { replace: true });
-    }
-  }, [navigate, isLoggedOut]);
+  // SUPPRIMÉ : La redirection automatique qui causait le problème
+  // L'effet qui forçait la redirection vers login a été retiré
+  // La vérification d'auth se fera maintenant uniquement via ProtectedRoute
 
   const login = (credentials: LoginRequest) => {
     return loginMutation.mutateAsync(credentials);
@@ -178,7 +184,8 @@ export const useAuth = () => {
       isLoggedOut,
       currentUser: currentUser?.email,
       isAuthenticated,
-      isLoadingUser
+      isLoadingUser,
+      isOnline: navigator.onLine
     });
   }, [hasTokens, isLoggedOut, currentUser, isAuthenticated, isLoadingUser]);
 
