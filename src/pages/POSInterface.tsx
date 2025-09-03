@@ -632,7 +632,7 @@ const networkStatus = useNetworkStatus();
               <Button 
                 className="w-full"
                 onClick={() => setIsValidationModalOpen(true)}
-                disabled={!currentUser || cart.length === 0 || isLoading}
+                disabled={!currentUser || cart.length === 0 }
                 size="lg"
               >
                 <CreditCard className="w-4 h-4 mr-2" />

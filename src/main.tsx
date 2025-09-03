@@ -47,20 +47,100 @@ const registerServiceWorker = async () => {
 };
 
 // 💾 INITIALISATION INDEXEDDB
+// 💾 INITIALISATION INDEXEDDB AVEC DIAGNOSTIC COMPLET
 const initializeIndexedDB = async () => {
   try {
     console.log('💾 Initialisation IndexedDB...');
+    console.log('💾 Navigateur supporté:', 'indexedDB' in window);
+    console.log('💾 Service disponible:', !!indexedDBService);
+    
+    // Test direct d'ouverture
+   // Test direct d'ouverture - VERSION CORRIGÉE
+console.log('💾 Test ouverture directe...');
+const testOpen = indexedDB.open('TestDB');
+testOpen.onsuccess = () => {
+  console.log('💾 Test ouverture: OK');
+  (testOpen.result as IDBDatabase).close();  // ← Cast TypeScript
+};
+testOpen.onerror = () => {  // ← Simplifié
+  console.error('💾 Test ouverture: FAILED', testOpen.error);
+};
+    
+    // Initialisation du service
+    console.log('💾 Appel indexedDBService.init()...');
     await indexedDBService.init();
     console.log('✅ IndexedDB initialisé avec succès');
+    
+    // Vérification immédiate
+    console.log('💾 Vérification des tables...');
+    const verifyDB = indexedDB.open('EasyPosOfflineDB');
+    verifyDB.onsuccess = () => {
+      const db = verifyDB.result;
+      const stores = Array.from(db.objectStoreNames);
+      console.log('💾 Tables créées:', stores);
+      if (stores.length === 0) {
+        console.error('❌ PROBLÈME: Aucune table créée !');
+      }
+      db.close();
+    };
     
     const stats = await indexedDBService.getStorageStats();
     console.log('📊 Statistiques stockage offline:', stats);
     
   } catch (error) {
     console.error('❌ Erreur initialisation IndexedDB:', error);
+    console.error('❌ Type d\'erreur:', error.constructor.name);
+    console.error('❌ Message:', error.message);
+    console.error('❌ Stack:', error.stack);
+    
+    // Force la création manuelle
+    console.log('🔧 Tentative de création manuelle...');
+    return forceCreateIndexedDB();
   }
 };
 
+// Fonction de création manuelle de secours
+// Fonction de création manuelle de secours - VERSION CORRIGÉE
+const forceCreateIndexedDB = (): Promise<void> => {  // ← Ajout du type de retour
+  return new Promise<void>((resolve, reject) => {    // ← Ajout du type générique
+    console.log('🔧 Création manuelle d\'IndexedDB...');
+    const request = indexedDB.open('EasyPosOfflineDB', 1);
+    
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;  // ← Cast TypeScript
+      console.log('🔧 Event onupgradeneeded déclenché');
+      
+      if (!db.objectStoreNames.contains('offlineTransactions')) {
+        const txStore = db.createObjectStore('offlineTransactions', { keyPath: 'tempId' });
+        txStore.createIndex('syncStatus', 'syncStatus');
+        txStore.createIndex('createdOfflineAt', 'createdOfflineAt');
+        console.log('🔧 Table offlineTransactions créée');
+      }
+      
+      if (!db.objectStoreNames.contains('articles')) {
+        db.createObjectStore('articles', { keyPath: 'id' });
+        console.log('🔧 Table articles créée');
+      }
+      
+      if (!db.objectStoreNames.contains('users')) {
+        const userStore = db.createObjectStore('users', { keyPath: 'id' });
+        userStore.createIndex('codeBadge', 'codeBadge', { unique: true });
+        console.log('🔧 Table users créée');
+      }
+    };
+    
+    request.onsuccess = () => {
+      console.log('🔧 Création manuelle réussie');
+      (request.result as IDBDatabase).close();  // ← Cast TypeScript
+      resolve();  // ← Maintenant valide car Promise<void>
+    };
+    
+    request.onerror = () => {  // ← Simplifié
+      console.error('🔧 Création manuelle échouée:', request.error);
+      reject(request.error);
+    };
+  });
+};
 // 📱 VÉRIFICATION SUPPORT PWA
 const checkPWACapabilities = () => {
   const capabilities = {
