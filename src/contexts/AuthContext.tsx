@@ -50,25 +50,53 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, [authHook.isAuthenticated, authHook.currentUser, navigate]);
 
   // Wrapper du login avec logique de redirection
-  const loginWithRedirection = async (credentials: LoginRequest): Promise<UtilisateurResponse> => {
-    const user = await authHook.login(credentials);
-    
-    // Après connexion réussie, rediriger selon le rôle
-    if (user.role === 'CAISSIER') {
-      // Les caissiers vont directement au POS
-      navigate('/pos', { replace: true });
-    } else {
-      // Les autres rôles vont au dashboard (ou là où ils étaient avant)
-      const from = (location.state as any)?.from?.pathname || '/dashboard';
-      navigate(from, { replace: true });
+ const loginWithRedirection = async (credentials: LoginRequest): Promise<UtilisateurResponse> => {
+  const user = await authHook.login(credentials);
+  
+  // NOUVEAU : Envoyer le token au Service Worker après connexion réussie
+  if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+    try {
+      const { offlineApiService } = await import('@/services/OfflineApiService');
+      await offlineApiService.sendAuthTokenToServiceWorker();
+      console.log('🔐 Token envoyé au Service Worker après login');
+    } catch (error) {
+      console.warn('⚠️ Erreur envoi token au SW:', error);
     }
-    
-    return user;
-  };
+  }
+  
+  // Logique de redirection selon le rôle (votre code existant)
+  if (user.role === 'CAISSIER') {
+    navigate('/pos', { replace: true });
+  } else {
+    const from = (location.state as any)?.from?.pathname || '/dashboard';
+    navigate(from, { replace: true });
+  }
+  
+  return user;
+};
+
+// AJOUTER cette nouvelle fonction de logout avec nettoyage SW
+const logoutWithCleanup = async (): Promise<void> => {
+  // NOUVEAU : Nettoyer le token du Service Worker avant logout
+  if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+    try {
+      const { offlineApiService } = await import('@/services/OfflineApiService');
+      await offlineApiService.clearAuthTokenFromServiceWorker();
+      console.log('🧹 Token nettoyé du Service Worker avant logout');
+    } catch (error) {
+      console.warn('⚠️ Erreur nettoyage token SW:', error);
+    }
+  }
+  
+  // Continuer avec le logout normal
+  await authHook.logout();
+};
 
   const contextValue: AuthContextType = {
     ...authHook,
     login: loginWithRedirection, // On override le login avec notre logique
+    logout: logoutWithCleanup, // NOUVEAU : utiliser la version avec nettoyage SW
+
   };
 
   return (

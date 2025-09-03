@@ -105,6 +105,8 @@ export const usePOS = () => {
 
   // Validation transaction avec gestion offline
   const validateTransaction = useCallback(async (): Promise<ValidationResult> => {
+    console.log("🔥 NOUVEAU CODE validateTransaction appelé");
+
     if (!currentUser || cart.length === 0) {
       return { success: false, error: 'Pas d\'utilisateur ou panier vide' };
     }
@@ -220,6 +222,38 @@ export const usePOS = () => {
     }
   }, [networkStatus.isOnline]);
 
+  // NOUVEAU : Fonction pour forcer la synchronisation avec background sync
+const forceSync = useCallback(async () => {
+  console.log('🔄 Synchronisation forcée demandée');
+  
+  const apiConnected = await networkStatus.testApiConnectivity();
+  if (!apiConnected) {
+    toast.error('Impossible de synchroniser : API non accessible', { 
+      duration: 3000,
+      icon: '📱' 
+    });
+    return { synced: 0, failed: 0, errors: ['API non accessible'] };
+  }
+
+  try {
+    if ('serviceWorker' in navigator && 'sync' in (window as any).ServiceWorkerRegistration.prototype) {
+      const registration = await navigator.serviceWorker.ready;
+      await (registration as any).sync.register('sync-offline-transactions');
+      
+      toast('Synchronisation programmée en arrière-plan', { 
+        duration: 2000,
+        icon: '🔄' 
+      });
+      
+      return { synced: 0, failed: 0, errors: [], backgroundSync: true };
+    }
+  } catch (error) {
+    console.warn('Background sync échoué, fallback manuel:', error);
+  }
+
+  return await syncOfflineTransactions();
+}, [networkStatus.testApiConnectivity, syncOfflineTransactions]);
+
   // Gestion du panier
   const addToCart = useCallback((article: ArticleDTO) => {
     if (!article.disponible || !article.status) {
@@ -320,21 +354,117 @@ export const usePOS = () => {
     refetchInterval: 30000, // Refresh toutes les 30 secondes
   });
 
-  // Synchronisation automatique à la reconnexion
+  // Écouter les messages du Service Worker pour les sync en arrière-plan
   useEffect(() => {
-    if (networkStatus.isOnline && networkStatus.lastOnlineAt) {
-      // Vérifier s'il y a des transactions en attente
-      if (offlineStats?.pendingTransactions && offlineStats.pendingTransactions > 0) {
-        // Synchroniser automatiquement après 2 secondes de reconnexion
-        const timer = setTimeout(() => {
-          syncOfflineTransactions();
-        }, 2000);
-        
-        return () => clearTimeout(timer);
+    const messageHandler = (event: MessageEvent) => {
+      const { type, payload } = event.data;
+      
+      switch (type) {
+        case 'SYNC_COMPLETE':
+          console.log('🔄 Background sync terminé:', payload);
+          if (payload.synced > 0) {
+            toast.success(
+              `${payload.synced} transaction(s) synchronisée(s) en arrière-plan`,
+              { duration: 3000, icon: '🔄' }
+            );
+          }
+          if (payload.failed > 0) {
+            toast.error(
+              `${payload.failed} transaction(s) échouée(s)`,
+              { duration: 4000, icon: '⚠️' }
+            );
+          }
+          break;
+        default:
+          console.log('Message SW non géré:', type);
       }
-    }
-  }, [networkStatus.isOnline, networkStatus.lastOnlineAt, offlineStats?.pendingTransactions, syncOfflineTransactions]);
+    };
 
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', messageHandler);
+      
+      return () => {
+        navigator.serviceWorker.removeEventListener('message', messageHandler);
+      };
+    }
+  }, []);
+
+  // Écouter les événements de synchronisation du Service Worker
+  useEffect(() => {
+    const handleSwSyncComplete = (event: CustomEvent) => {
+      const { synced, failed, errors } = event.detail;
+      
+      if (synced > 0) {
+        toast.success(
+          `${synced} transaction(s) synchronisée(s) en arrière-plan`,
+          { duration: 3000, icon: '🔄' }
+        );
+      }
+      
+      if (failed > 0) {
+        toast.error(
+          `${failed} transaction(s) échouée(s) lors de la sync`,
+          { duration: 4000, icon: '⚠️' }
+        );
+      }
+    };
+
+    const handleSwSyncError = (event: CustomEvent) => {
+      const { error } = event.detail;
+      toast.error(`Erreur synchronisation: ${error}`, { 
+        duration: 4000, 
+        icon: '❌' 
+      });
+    };
+
+    window.addEventListener('swSyncComplete', handleSwSyncComplete as EventListener);
+    window.addEventListener('swSyncError', handleSwSyncError as EventListener);
+    
+    return () => {
+      window.removeEventListener('swSyncComplete', handleSwSyncComplete as EventListener);
+      window.removeEventListener('swSyncError', handleSwSyncError as EventListener);
+    };
+  }, []);
+
+  // Synchronisation automatique améliorée à la reconnexion
+useEffect(() => {
+  let reconnectionTimer: NodeJS.Timeout;
+  
+  if (networkStatus.isOnline && networkStatus.lastOnlineAt) {
+    const shouldAutoSync = offlineStats?.pendingTransactions && offlineStats.pendingTransactions > 0;
+    
+    if (shouldAutoSync) {
+      console.log('🔄 Reconnexion détectée avec transactions en attente');
+      
+      toast('Reconnexion détectée - Synchronisation en cours...', { 
+        duration: 2000,
+        icon: '🌐' 
+      });
+      
+      reconnectionTimer = setTimeout(async () => {
+        try {
+          if ('serviceWorker' in navigator && 'sync' in (window as any).ServiceWorkerRegistration.prototype) {
+            const registration = await navigator.serviceWorker.ready;
+            await (registration as any).sync.register('sync-offline-transactions');
+            console.log('✅ Background sync programmé pour reconnexion');
+          } else {
+            console.log('⚠️ Background sync non supporté - synchronisation manuelle');
+            await syncOfflineTransactions();
+          }
+        } catch (error) {
+          console.error('❌ Erreur auto-sync:', error);
+          await syncOfflineTransactions();
+        }
+      }, 2000);
+    }
+  }
+  
+  return () => {
+    if (reconnectionTimer) {
+      clearTimeout(reconnectionTimer);
+    }
+  };
+}, [networkStatus.isOnline, networkStatus.lastOnlineAt, offlineStats?.pendingTransactions, syncOfflineTransactions]);
   return {
     // États
     currentUser,
@@ -351,6 +481,7 @@ export const usePOS = () => {
     validateBadge,
     validateTransaction,
     syncOfflineTransactions,
+    forceSync, // NOUVEAU
     
     // Actions panier
     addToCart,

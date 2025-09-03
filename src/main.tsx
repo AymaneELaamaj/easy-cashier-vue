@@ -2,7 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
-import { indexedDBService } from './services/indexedDBService'; // NOUVEAU IMPORT
+import { indexedDBService } from './services/indexedDBService';
 
 // 🔧 ENREGISTREMENT DU SERVICE WORKER
 const registerServiceWorker = async () => {
@@ -16,7 +16,6 @@ const registerServiceWorker = async () => {
       
       console.log('✅ Service Worker enregistré avec succès:', registration);
       
-      // Gestion des mises à jour du Service Worker
       registration.addEventListener('updatefound', () => {
         const newWorker = registration.installing;
         console.log('🔄 Nouvelle version du Service Worker détectée');
@@ -25,13 +24,11 @@ const registerServiceWorker = async () => {
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
               console.log('🆕 Service Worker mis à jour et prêt');
-              // Optionnel: notifier l'utilisateur qu'une mise à jour est disponible
             }
           });
         }
       });
       
-      // Vérifier les mises à jour existantes
       if (registration.waiting) {
         console.log('⏳ Service Worker en attente d\'activation');
       }
@@ -49,20 +46,18 @@ const registerServiceWorker = async () => {
   }
 };
 
-// NOUVEAU 💾 INITIALISATION INDEXEDDB
+// 💾 INITIALISATION INDEXEDDB
 const initializeIndexedDB = async () => {
   try {
     console.log('💾 Initialisation IndexedDB...');
     await indexedDBService.init();
     console.log('✅ IndexedDB initialisé avec succès');
     
-    // Optionnel : afficher les stats de stockage
     const stats = await indexedDBService.getStorageStats();
     console.log('📊 Statistiques stockage offline:', stats);
     
   } catch (error) {
     console.error('❌ Erreur initialisation IndexedDB:', error);
-    // L'app peut continuer sans IndexedDB, mais en mode online uniquement
   }
 };
 
@@ -70,7 +65,7 @@ const initializeIndexedDB = async () => {
 const checkPWACapabilities = () => {
   const capabilities = {
     serviceWorker: 'serviceWorker' in navigator,
-    indexedDB: 'indexedDB' in window, // NOUVEAU CHECK
+    indexedDB: 'indexedDB' in window,
     pushNotifications: 'PushManager' in window,
     backgroundSync: 'serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype,
     installPrompt: 'BeforeInstallPromptEvent' in window || 
@@ -93,21 +88,65 @@ const setupNetworkDetection = () => {
     const isOnline = navigator.onLine;
     console.log(`🌐 État réseau: ${isOnline ? 'EN LIGNE' : 'HORS LIGNE'}`);
     
-    // Dispatch d'un événement personnalisé pour notifier l'app
     window.dispatchEvent(new CustomEvent('networkStatusChange', {
       detail: { isOnline }
     }));
   };
 
-  // Écouter les changements de connectivité
   window.addEventListener('online', updateNetworkStatus);
   window.addEventListener('offline', updateNetworkStatus);
   
-  // État initial
   updateNetworkStatus();
 };
 
-// 🚀 INITIALISATION DE L'APPLICATION - MODIFIÉ
+// 📡 COMMUNICATION AVEC LE SERVICE WORKER
+const setupServiceWorkerCommunication = () => {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      const { type, payload } = event.data;
+      
+      switch (type) {
+        case 'REQUEST_AUTH_TOKEN':
+          // Le SW demande le token d'auth
+          const token = localStorage.getItem('authToken') || 
+                        localStorage.getItem('token') || 
+                        localStorage.getItem('accessToken');
+          
+          // Répondre avec le token
+          event.ports[0].postMessage({
+            type: 'AUTH_TOKEN_RESPONSE',
+            token: token
+          });
+          
+          console.log('📡 Token d\'auth envoyé au Service Worker');
+          break;
+          
+        case 'SYNC_COMPLETE':
+          // Synchronisation terminée
+          console.log('🔄 Sync terminée depuis SW:', payload);
+          
+          // Dispatch un événement personnalisé pour l'application
+          window.dispatchEvent(new CustomEvent('swSyncComplete', {
+            detail: payload
+          }));
+          break;
+          
+        case 'SYNC_ERROR':
+          console.error('❌ Erreur sync depuis SW:', payload);
+          
+          window.dispatchEvent(new CustomEvent('swSyncError', {
+            detail: payload
+          }));
+          break;
+          
+        default:
+          console.log('Message SW non géré:', type);
+      }
+    });
+  }
+};
+
+// 🚀 INITIALISATION DE L'APPLICATION
 const initializeApp = async () => {
   console.log('🚀 Initialisation EasyPOS...');
   
@@ -117,7 +156,7 @@ const initializeApp = async () => {
   // 2. Configurer la détection réseau
   setupNetworkDetection();
   
-  // 3. NOUVEAU - Initialiser IndexedDB en premier
+  // 3. Initialiser IndexedDB en premier
   if (pwaCapabilities.indexedDB) {
     await initializeIndexedDB();
   } else {
@@ -129,7 +168,10 @@ const initializeApp = async () => {
     await registerServiceWorker();
   }
   
-  // 5. Monter l'application React
+  // 5. NOUVEAU : Configurer la communication avec le Service Worker
+  setupServiceWorkerCommunication();
+  
+  // 6. Monter l'application React
   const rootElement = document.getElementById('root');
   if (rootElement) {
     const root = ReactDOM.createRoot(rootElement);
@@ -143,7 +185,7 @@ const initializeApp = async () => {
     console.error('❌ Élément root non trouvé');
   }
   
-  console.log('🎉 EasyPOS initialisé - PWA avec stockage offline prête !'); // MODIFIÉ
+  console.log('🎉 EasyPOS initialisé - PWA avec Background Sync prête !');
 };
 
 // 🏁 DÉMARRAGE

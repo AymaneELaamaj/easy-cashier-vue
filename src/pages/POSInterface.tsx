@@ -25,7 +25,6 @@ const POSInterface: React.FC = () => {
   // Dans le composant
 const networkStatus = useNetworkStatus();
 
-console.log('Network Status:', networkStatus);
   // Hooks customs - Utilisation de usePOSArticles au lieu de useArticles
   const { articles, isLoading: articlesLoading, refetch: refetchArticles } = usePOSArticles();
   const { 

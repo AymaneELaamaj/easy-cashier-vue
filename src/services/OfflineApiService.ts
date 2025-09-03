@@ -131,7 +131,7 @@ class OfflineApiService {
             email: user.email,
             codeBadge: user.codeBadge,
             solde: user.solde,
-            categoryId: user.categorieEmployeId,
+            categoryId: user.categorieEmployesId,
             cachedAt: new Date().toISOString(),
           });
           
@@ -291,6 +291,85 @@ class OfflineApiService {
       lastSyncAt: localStorage.getItem('lastOfflineSync') || undefined,
     };
   }
+  /**
+ * Envoyer le token d'auth au Service Worker
+ */
+async sendAuthTokenToServiceWorker(): Promise<void> {
+  if (!('serviceWorker' in navigator)) {
+    return;
+  }
+
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    
+    if (registration.active) {
+      // Récupérer le token (utilise la même logique que getAuthHeaders)
+      const token = localStorage.getItem('authToken') || 
+                    localStorage.getItem('token') || 
+                    localStorage.getItem('accessToken');
+
+      if (token) {
+        const messageChannel = new MessageChannel();
+        
+        messageChannel.port1.onmessage = (event) => {
+          if (event.data.type === 'AUTH_TOKEN_UPDATED') {
+            console.log('✅ [OfflineAPI] Token envoyé au Service Worker');
+          }
+        };
+
+        registration.active.postMessage(
+          { 
+            type: 'SET_AUTH_TOKEN', 
+            payload: { token } 
+          },
+          [messageChannel.port2]
+        );
+      }
+    }
+  } catch (error) {
+    console.warn('[OfflineAPI] Erreur envoi token au SW:', error);
+  }
+}
+
+/**
+ * Nettoyer le token dans le Service Worker
+ */
+async clearAuthTokenFromServiceWorker(): Promise<void> {
+  if (!('serviceWorker' in navigator)) {
+    return;
+  }
+
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    
+    if (registration.active) {
+      registration.active.postMessage({ type: 'CLEAR_AUTH_TOKEN' });
+      console.log('🧹 [OfflineAPI] Token nettoyé du Service Worker');
+    }
+  } catch (error) {
+    console.warn('[OfflineAPI] Erreur nettoyage token SW:', error);
+  }
+}
+
+/**
+ * Enregistrer un background sync pour synchroniser les transactions offline
+ */
+async registerBackgroundSync(): Promise<boolean> {
+  if (!('serviceWorker' in navigator) || !('sync' in (window as any).ServiceWorkerRegistration.prototype)) {
+    console.warn('[OfflineAPI] Background Sync non supporté');
+    return false;
+  }
+
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    await (registration as any).sync.register('sync-offline-transactions');
+    console.log('✅ [OfflineAPI] Background sync enregistré');
+    return true;
+  } catch (error) {
+    console.error('❌ [OfflineAPI] Erreur enregistrement background sync:', error);
+    return false;
+  }
+}
 
   // MÉTHODES PRIVÉES
 
@@ -365,89 +444,92 @@ class OfflineApiService {
     }
   }
 
-  private async createOfflineTransaction(transactionData: {
-    userEmail: string;
-    articles: Array<{ articleId: number; quantite: number }>;
-    utilisateur: UtilisateurResponse;
-    cartTotal: number;
-    estimatedSubvention: number;
-    estimatedToPay: number;
-    articleDetails: ArticleDTO[];
-  }): Promise<{
-    success: boolean;
-    data?: any;
-    error?: string;
-    isOffline: boolean;
-  }> {
-    try {
-      const now = new Date();
-      const tempId = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const numeroTicket = `OFF-${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}-${tempId.slice(-6)}`;
+private async createOfflineTransaction(transactionData: {
+  userEmail: string;
+  articles: Array<{ articleId: number; quantite: number }>;
+  utilisateur: UtilisateurResponse;
+  cartTotal: number;
+  estimatedSubvention: number;
+  estimatedToPay: number;
+  articleDetails: ArticleDTO[];
+}): Promise<{
+  success: boolean;
+  data?: any;
+  error?: string;
+  isOffline: boolean;
+}> {
+  try {
+    const now = new Date();
+    const tempId = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const numeroTicket = `OFF-${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}-${tempId.slice(-6)}`;
 
-      const offlineTransaction: OfflineTransaction = {
-        tempId,
-        numeroTicket,
-        date: now.toISOString(),
-        montantTotal: transactionData.cartTotal,
-        partSalariale: transactionData.estimatedToPay,
-        partPatronale: transactionData.estimatedSubvention,
-        articles: transactionData.articles.map(item => {
-          const articleDetail = transactionData.articleDetails.find(a => a.id === item.articleId);
-          return {
-            articleId: item.articleId,
-            nom: articleDetail?.nom || 'Article inconnu',
-            quantite: item.quantite,
-            prixUnitaire: parseFloat(articleDetail?.prix || '0'),
-            montantTotal: item.quantite * parseFloat(articleDetail?.prix || '0'),
-            subventionTotale: 0, // À calculer plus tard
-            partSalariale: item.quantite * parseFloat(articleDetail?.prix || '0'),
-          };
-        }),
-        utilisateur: {
-          id: transactionData.utilisateur.id,
-          nom: transactionData.utilisateur.nom,
-          prenom: transactionData.utilisateur.prenom,
-          email: transactionData.utilisateur.email,
-          codeBadge: transactionData.utilisateur.codeBadge,
-        },
-        syncStatus: 'PENDING',
-        createdOfflineAt: now.toISOString(),
-        syncRetryCount: 0,
-      };
+    const offlineTransaction: OfflineTransaction = {
+      tempId,
+      numeroTicket,
+      date: now.toISOString(),
+      montantTotal: transactionData.cartTotal,
+      partSalariale: transactionData.estimatedToPay,
+      partPatronale: transactionData.estimatedSubvention,
+      articles: transactionData.articles.map(item => {
+        const articleDetail = transactionData.articleDetails.find(a => a.id === item.articleId);
+        return {
+          articleId: item.articleId,
+          nom: articleDetail?.nom || 'Article inconnu',
+          quantite: item.quantite,
+          prixUnitaire: parseFloat(articleDetail?.prix || '0'),
+          montantTotal: item.quantite * parseFloat(articleDetail?.prix || '0'),
+          subventionTotale: 0,
+          partSalariale: item.quantite * parseFloat(articleDetail?.prix || '0'),
+        };
+      }),
+      utilisateur: {
+        id: transactionData.utilisateur.id,
+        nom: transactionData.utilisateur.nom,
+        prenom: transactionData.utilisateur.prenom,
+        email: transactionData.utilisateur.email,
+        codeBadge: transactionData.utilisateur.codeBadge,
+      },
+      syncStatus: 'PENDING',
+      createdOfflineAt: now.toISOString(),
+      syncRetryCount: 0,
+    };
 
-      await indexedDBService.storeOfflineTransaction(offlineTransaction);
-      
-      console.log(`[OfflineAPI] Transaction offline créée: ${numeroTicket}`);
-      
-      // Simuler une réponse API pour compatibilité
-      const offlineResponse = {
-        status: 'offline_success',
-        message: 'Transaction enregistrée en mode offline',
-        numeroTicket,
-        utilisateurNomComplet: `${transactionData.utilisateur.prenom} ${transactionData.utilisateur.nom}`,
-        montantTotal: transactionData.cartTotal,
-        partSalariale: transactionData.estimatedToPay,
-        partPatronale: transactionData.estimatedSubvention,
-        soldeActuel: transactionData.utilisateur.solde,
-        nouveauSolde: transactionData.utilisateur.solde - transactionData.estimatedToPay,
-        articles: offlineTransaction.articles,
-        transactionId: tempId,
-      };
+    await indexedDBService.storeOfflineTransaction(offlineTransaction);
+    
+    console.log(`[OfflineAPI] Transaction offline créée: ${numeroTicket}`);
+    
+    // NOUVEAU : Enregistrer le background sync après création
+    await this.registerBackgroundSync();
+    console.log('🔄 [OfflineAPI] Background sync programmé pour la transaction');
+    
+    const offlineResponse = {
+      status: 'offline_success',
+      message: 'Transaction enregistrée en mode offline',
+      numeroTicket,
+      utilisateurNomComplet: `${transactionData.utilisateur.prenom} ${transactionData.utilisateur.nom}`,
+      montantTotal: transactionData.cartTotal,
+      partSalariale: transactionData.estimatedToPay,
+      partPatronale: transactionData.estimatedSubvention,
+      soldeActuel: transactionData.utilisateur.solde,
+      nouveauSolde: transactionData.utilisateur.solde - transactionData.estimatedToPay,
+      articles: offlineTransaction.articles,
+      transactionId: tempId,
+    };
 
-      return {
-        success: true,
-        data: offlineResponse,
-        isOffline: true,
-      };
-    } catch (error) {
-      console.error('[OfflineAPI] Erreur création transaction offline:', error);
-      return {
-        success: false,
-        error: 'Impossible de créer la transaction offline',
-        isOffline: true,
-      };
-    }
+    return {
+      success: true,
+      data: offlineResponse,
+      isOffline: true,
+    };
+  } catch (error) {
+    console.error('[OfflineAPI] Erreur création transaction offline:', error);
+    return {
+      success: false,
+      error: 'Impossible de créer la transaction offline',
+      isOffline: true,
+    };
   }
+}
 }
 
 // Instance singleton

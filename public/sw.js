@@ -1,4 +1,4 @@
-// Service Worker EasyPOS - Version 1.0.0
+// Service Worker EasyPOS - Version 1.0.0 avec Background Sync
 const CACHE_NAME = 'easypos-cache-v1';
 const STATIC_CACHE = 'easypos-static-v1';
 const DYNAMIC_CACHE = 'easypos-dynamic-v1';
@@ -28,8 +28,12 @@ const CRITICAL_API_ENDPOINTS = [
   `${API_BASE_URL}/articles/products`,
   `${API_BASE_URL}/pos/health`,
   `${API_BASE_URL}/utilisateurs/badge`,
-  `${API_BASE_URL}/utilisateurs/account`  // AJOUTÉ pour éviter erreur auth offline
+  `${API_BASE_URL}/utilisateurs/account`
 ];
+
+// Variables globales pour l'authentification
+let cachedAuthToken = null;
+let tokenLastUpdated = null;
 
 // 🚀 INSTALLATION DU SERVICE WORKER
 self.addEventListener('install', (event) => {
@@ -37,14 +41,12 @@ self.addEventListener('install', (event) => {
   
   event.waitUntil(
     Promise.all([
-      // Cache des ressources statiques critiques
       caches.open(STATIC_CACHE).then((cache) => {
         console.log('📦 [SW] Mise en cache des ressources critiques');
         return cache.addAll(CRITICAL_RESOURCES);
       })
     ]).then(() => {
       console.log('✅ [SW] Installation terminée avec succès');
-      // Force l'activation immédiate
       return self.skipWaiting();
     }).catch((error) => {
       console.error('❌ [SW] Erreur lors de l\'installation:', error);
@@ -58,7 +60,6 @@ self.addEventListener('activate', (event) => {
   
   event.waitUntil(
     Promise.all([
-      // Nettoyage des anciens caches
       caches.keys().then((cacheNames) => {
         return Promise.all(
           cacheNames.map((cacheName) => {
@@ -72,7 +73,6 @@ self.addEventListener('activate', (event) => {
           })
         );
       }),
-      // Prise de contrôle immédiate
       self.clients.claim()
     ]).then(() => {
       console.log('✅ [SW] Activation terminée - Service Worker actif');
@@ -82,53 +82,52 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 🌐 INTERCEPTION DES REQUÊTES
+// 🌐 INTERCEPTION DES REQUÊTES + EXTRACTION TOKEN
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   const url = new URL(request.url);
+  const authHeader = request.headers.get('Authorization');
   
-  // Ignorer les requêtes non-HTTP
+  // Extraire et cacher le token Bearer des requêtes sortantes
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.replace('Bearer ', '');
+    if (token !== cachedAuthToken) {
+      cachedAuthToken = token;
+      tokenLastUpdated = Date.now();
+      console.log('🔐 [SW] Token d\'auth mis à jour depuis les requêtes');
+    }
+  }
+  
   if (!request.url.startsWith('http')) {
     return;
   }
 
-  // Stratégie selon le type de requête
   if (url.pathname.startsWith('/api/')) {
-    // Requêtes API
     event.respondWith(handleApiRequest(request));
   } else if (request.destination === 'image') {
-    // Images
     event.respondWith(handleImageRequest(request));
   } else if (request.destination === 'document' || 
              url.pathname.endsWith('.html') || 
              APP_ROUTES.includes(url.pathname)) {
-    // Pages/routes de l'application
     event.respondWith(handlePageRequest(request));
   } else {
-    // Ressources statiques (JS, CSS, etc.)
     event.respondWith(handleStaticRequest(request));
   }
 });
 
-// 📡 GESTION DES REQUÊTES API - Network First avec cache fallback
+// 📡 GESTION DES REQUÊTES API
 async function handleApiRequest(request) {
   const url = new URL(request.url);
   console.log('📡 [SW] Requête API:', url.pathname);
 
   try {
-    // Tentative réseau d'abord - TOUJOURS essayer le réseau
     const networkResponse = await fetch(request);
-    
     console.log(`📡 [SW] Réponse réseau pour ${url.pathname}:`, networkResponse.status);
     
     if (networkResponse.ok) {
-      // Mettre en cache les réponses réussies
       const cache = await caches.open(API_CACHE);
-      
-      // Cloner pour le cache (la réponse ne peut être lue qu'une fois)
       const responseToCache = networkResponse.clone();
       
-      // Cache seulement les GET et les endpoints critiques
       if (request.method === 'GET' && isCriticalEndpoint(url.pathname)) {
         await cache.put(request, responseToCache);
         console.log('💾 [SW] API mise en cache:', url.pathname);
@@ -136,22 +135,18 @@ async function handleApiRequest(request) {
       
       return networkResponse;
     } else {
-      // Si le serveur retourne une erreur (401, 404, 500, etc.)
-      // on DOIT laisser cette erreur passer à l'application
-      console.log(`⚠️ [SW] Erreur serveur ${networkResponse.status} pour ${url.pathname} - transmission à l'app`);
-      return networkResponse; // MODIFIÉ : Retourner la réponse d'erreur au lieu de throw
+      console.log(`⚠️ [SW] Erreur serveur ${networkResponse.status} pour ${url.pathname}`);
+      return networkResponse;
     }
   } catch (error) {
     console.log('🔄 [SW] Réseau complètement échoué pour:', url.pathname, error);
     
-    // Fallback vers le cache seulement si le réseau est complètement inaccessible
     const cachedResponse = await caches.match(request);
     if (cachedResponse) {
       console.log('📦 [SW] Réponse servie depuis le cache:', url.pathname);
       return cachedResponse;
     }
     
-    // Si c'est le health check, retourner une réponse offline
     if (url.pathname.includes('/pos/health')) {
       return new Response(JSON.stringify({
         status: 'offline',
@@ -165,13 +160,11 @@ async function handleApiRequest(request) {
       });
     }
     
-    console.error('❌ [SW] Pas de cache disponible pour:', url.pathname);
-    // MODIFIÉ : Re-throw l'erreur pour que l'app la gère
     throw error;
   }
 }
 
-// 🖼️ GESTION DES IMAGES - Cache First avec network fallback
+// 🖼️ GESTION DES IMAGES
 async function handleImageRequest(request) {
   const cachedResponse = await caches.match(request);
   
@@ -187,27 +180,23 @@ async function handleImageRequest(request) {
     }
     return networkResponse;
   } catch (error) {
-    // Retourner une image placeholder en cas d'échec
     return new Response('', { status: 404 });
   }
 }
 
-// 📄 GESTION DES PAGES - Network First avec cache fallback
+// 📄 GESTION DES PAGES
 async function handlePageRequest(request) {
   const url = new URL(request.url);
   console.log('📄 [SW] Requête page:', url.pathname);
   
   try {
-    // TOUJOURS essayer le réseau d'abord
     const networkResponse = await fetch(request);
     
     if (networkResponse.ok) {
       console.log('🌐 [SW] Page servie depuis le réseau:', url.pathname);
       
-      // Mettre en cache la réponse réussie
       const cache = await caches.open(STATIC_CACHE);
       
-      // Pour les routes React, cacher sous '/'
       if (APP_ROUTES.includes(url.pathname) || url.pathname.startsWith('/pos')) {
         const indexRequest = new Request(new URL('/', request.url).href);
         cache.put(indexRequest, networkResponse.clone());
@@ -222,10 +211,8 @@ async function handlePageRequest(request) {
   } catch (error) {
     console.log('🔄 [SW] Réseau échoué pour page, tentative cache:', url.pathname);
     
-    // Fallback vers le cache seulement si le réseau échoue
     let cachedResponse;
     
-    // Pour les routes React, chercher index.html
     if (APP_ROUTES.includes(url.pathname) || url.pathname.startsWith('/pos')) {
       const indexRequest = new Request(new URL('/', request.url).href);
       cachedResponse = await caches.match(indexRequest);
@@ -238,8 +225,6 @@ async function handlePageRequest(request) {
       return cachedResponse;
     }
     
-    // Page fallback offline en dernier recours
-    console.log('🚫 [SW] Aucune page en cache, affichage page offline');
     return new Response(`
       <!DOCTYPE html>
       <html>
@@ -281,14 +266,8 @@ async function handlePageRequest(request) {
           <p><strong>Reconnexion automatique en cours...</strong></p>
         </div>
         <script>
-          console.log('📱 Page offline chargée');
-          
-          // Fonction de reconnexion améliorée
           const attemptReconnection = async () => {
-            console.log('🔄 Tentative de reconnexion...');
-            
             try {
-              // Test direct de votre API
               const healthResponse = await fetch('http://localhost:8080/api/pos/health', {
                 method: 'GET',
                 cache: 'no-cache',
@@ -296,31 +275,22 @@ async function handlePageRequest(request) {
               });
               
               if (healthResponse.ok) {
-                console.log('✅ API accessible - redirection...');
-                // Forcer le rechargement sans cache
                 window.location.href = window.location.href + '?t=' + Date.now();
                 return true;
               }
             } catch (error) {
-              console.log('❌ API encore inaccessible:', error.message);
+              console.log('API encore inaccessible:', error.message);
             }
-            
             return false;
           };
           
-          // Vérification immédiate
           attemptReconnection();
-          
-          // Vérification périodique toutes les 3 secondes
           const reconnectInterval = setInterval(attemptReconnection, 3000);
           
-          // Écouter l'événement online + test immédiat
           window.addEventListener('online', () => {
-            console.log('🔌 Event online détecté');
             setTimeout(attemptReconnection, 500);
           });
           
-          // Nettoyage
           window.addEventListener('beforeunload', () => {
             clearInterval(reconnectInterval);
           });
@@ -334,7 +304,7 @@ async function handlePageRequest(request) {
   }
 }
 
-// 📦 GESTION DES RESSOURCES STATIQUES - Cache First
+// 📦 GESTION DES RESSOURCES STATIQUES
 async function handleStaticRequest(request) {
   const cachedResponse = await caches.match(request);
   
@@ -357,23 +327,46 @@ async function handleStaticRequest(request) {
   }
 }
 
-// 🎯 VÉRIFIER SI L'ENDPOINT EST CRITIQUE
 function isCriticalEndpoint(pathname) {
   const criticalPaths = [
     '/articles/products',
     '/pos/health',
     '/utilisateurs/badge',
-    '/utilisateurs/account'  // AJOUTÉ pour cache auth
+    '/utilisateurs/account'
   ];
   
   return criticalPaths.some(path => pathname.includes(path));
 }
 
-// 📨 GESTION DES MESSAGES (pour communication avec l'app)
+// 📨 GESTION DES MESSAGES + AUTHENTIFICATION
 self.addEventListener('message', (event) => {
   const { type, payload } = event.data;
   
   switch (type) {
+    case 'SET_AUTH_TOKEN':
+      cachedAuthToken = payload.token;
+      tokenLastUpdated = Date.now();
+      console.log('🔐 [SW] Token d\'auth reçu via message:', !!cachedAuthToken);
+      
+      event.ports[0]?.postMessage({ 
+        type: 'AUTH_TOKEN_UPDATED', 
+        success: true 
+      });
+      break;
+      
+    case 'CLEAR_AUTH_TOKEN':
+      cachedAuthToken = null;
+      tokenLastUpdated = null;
+      console.log('🔐 [SW] Token d\'auth effacé');
+      break;
+
+    case 'REQUEST_AUTH_TOKEN':
+      event.ports[0].postMessage({
+        type: 'AUTH_TOKEN_RESPONSE',
+        token: cachedAuthToken
+      });
+      break;
+      
     case 'SKIP_WAITING':
       console.log('⏭️ [SW] Skip waiting demandé');
       self.skipWaiting();
@@ -396,7 +389,209 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// 📊 OBTENIR LE STATUT DES CACHES
+// 🔄 BACKGROUND SYNC
+self.addEventListener('sync', (event) => {
+  console.log('🔄 [SW] Background sync déclenché:', event.tag);
+  
+  if (event.tag === 'sync-offline-transactions') {
+    event.waitUntil(syncOfflineTransactions());
+  }
+});
+
+// 📤 SYNCHRONISATION DES TRANSACTIONS OFFLINE - VERSION COMPLÈTE
+async function syncOfflineTransactions() {
+  console.log('📤 [SW] Début sync des transactions offline...');
+  
+  try {
+    // Récupérer le token d'authentification
+    const authToken = await getAuthToken();
+    
+    if (!authToken) {
+      throw new Error('Impossible de récupérer le token d\'authentification');
+    }
+    
+    // Ouvrir IndexedDB
+    const db = await openIndexedDB();
+    const pendingTransactions = await getPendingTransactionsFromDB(db);
+    
+    console.log(`📤 [SW] ${pendingTransactions.length} transactions à synchroniser`);
+    
+    let synced = 0;
+    let failed = 0;
+    const errors = [];
+    
+    for (const transaction of pendingTransactions) {
+      try {
+        await updateTransactionStatus(db, transaction.tempId, 'SYNCING');
+        
+        const response = await fetch(`${API_BASE_URL}/pos/validate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            userEmail: transaction.utilisateur.email,
+            articles: transaction.articles.map(a => ({
+              articleId: a.articleId,
+              quantite: a.quantite,
+            })),
+          }),
+        });
+
+        if (response.ok) {
+          await updateTransactionStatus(db, transaction.tempId, 'SYNCED');
+          synced++;
+          console.log(`✅ [SW] Transaction ${transaction.tempId} synchronisée`);
+        } else if (response.status === 401 || response.status === 403) {
+          throw new Error(`Erreur d'authentification: ${response.status}`);
+        } else {
+          throw new Error(`Erreur API: ${response.status}`);
+        }
+      } catch (error) {
+        await updateTransactionStatus(db, transaction.tempId, 'FAILED', error.message);
+        failed++;
+        errors.push(`Transaction ${transaction.tempId}: ${error.message}`);
+        console.error(`❌ [SW] Échec sync ${transaction.tempId}:`, error);
+      }
+    }
+    
+    await notifyMainApp({
+      type: 'SYNC_COMPLETE',
+      payload: { synced, failed, errors }
+    });
+    
+    console.log(`🎯 [SW] Sync terminée: ${synced} réussies, ${failed} échouées`);
+    return { synced, failed, errors };
+    
+  } catch (error) {
+    console.error('❌ [SW] Erreur générale sync transactions:', error);
+    
+    await notifyMainApp({
+      type: 'SYNC_ERROR',
+      payload: { error: error.message }
+    });
+    
+    throw error;
+  }
+}
+
+// FONCTIONS D'AUTHENTIFICATION
+async function getAuthToken() {
+  if (cachedAuthToken && tokenLastUpdated) {
+    const tokenAge = Date.now() - tokenLastUpdated;
+    const maxAge = 10 * 60 * 1000; // 10 minutes
+    
+    if (tokenAge < maxAge) {
+      console.log('🔐 [SW] Utilisation du token caché');
+      return cachedAuthToken;
+    }
+  }
+  
+  try {
+    const clients = await self.clients.matchAll({ includeUncontrolled: true });
+    
+    if (clients.length > 0) {
+      console.log('📡 [SW] Demande du token à l\'application principale...');
+      
+      const messageChannel = new MessageChannel();
+      
+      const tokenPromise = new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Timeout: pas de réponse pour le token'));
+        }, 5000);
+        
+        messageChannel.port1.onmessage = (event) => {
+          clearTimeout(timeout);
+          
+          if (event.data.type === 'AUTH_TOKEN_RESPONSE') {
+            if (event.data.token) {
+              cachedAuthToken = event.data.token;
+              tokenLastUpdated = Date.now();
+              resolve(event.data.token);
+            } else {
+              reject(new Error('Aucun token reçu'));
+            }
+          } else {
+            reject(new Error('Réponse inattendue'));
+          }
+        };
+      });
+      
+      clients[0].postMessage(
+        { type: 'REQUEST_AUTH_TOKEN' },
+        [messageChannel.port2]
+      );
+      
+      return await tokenPromise;
+    }
+  } catch (error) {
+    console.error('❌ [SW] Erreur récupération token:', error);
+  }
+  
+  console.warn('⚠️ [SW] Aucun token d\'authentification disponible');
+  return null;
+}
+
+// FONCTIONS INDEXEDDB
+function openIndexedDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('EasyPosOfflineDB', 1);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function getPendingTransactionsFromDB(db) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(['offlineTransactions'], 'readonly');
+    const store = tx.objectStore('offlineTransactions');
+    const index = store.index('syncStatus');
+    const request = index.getAll('PENDING');
+    
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function updateTransactionStatus(db, tempId, status, error = null) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(['offlineTransactions'], 'readwrite');
+    const store = tx.objectStore('offlineTransactions');
+    
+    const getRequest = store.get(tempId);
+    getRequest.onsuccess = () => {
+      const transaction = getRequest.result;
+      if (transaction) {
+        transaction.syncStatus = status;
+        transaction.lastSyncAttempt = new Date().toISOString();
+        
+        if (status === 'FAILED') {
+          transaction.syncRetryCount = (transaction.syncRetryCount || 0) + 1;
+          transaction.syncError = error;
+        } else if (status === 'SYNCED') {
+          transaction.syncError = undefined;
+        }
+        
+        const updateRequest = store.put(transaction);
+        updateRequest.onsuccess = () => resolve();
+        updateRequest.onerror = () => reject(updateRequest.error);
+      } else {
+        reject(new Error('Transaction not found'));
+      }
+    };
+    getRequest.onerror = () => reject(getRequest.error);
+  });
+}
+
+async function notifyMainApp(message) {
+  const clients = await self.clients.matchAll();
+  clients.forEach(client => {
+    client.postMessage(message);
+  });
+}
+
+// FONCTIONS UTILITAIRES
 async function getCacheStatus() {
   const cacheNames = await caches.keys();
   const status = {};
@@ -410,7 +605,6 @@ async function getCacheStatus() {
   return status;
 }
 
-// 🗑️ NETTOYER TOUS LES CACHES
 async function clearAllCaches() {
   const cacheNames = await caches.keys();
   await Promise.all(
@@ -419,31 +613,6 @@ async function clearAllCaches() {
   console.log('🧹 [SW] Tous les caches supprimés');
 }
 
-// 🔄 SYNC DES DONNÉES OFFLINE (préparation future)
-self.addEventListener('sync', (event) => {
-  console.log('🔄 [SW] Background sync déclenché:', event.tag);
-  
-  if (event.tag === 'sync-offline-transactions') {
-    event.waitUntil(syncOfflineTransactions());
-  }
-});
-
-// 📤 SYNCHRONISATION DES TRANSACTIONS OFFLINE (squelette pour phase 4)
-async function syncOfflineTransactions() {
-  console.log('📤 [SW] Début sync des transactions offline...');
-  
-  try {
-    // TODO: Implémenter la synchronisation des transactions stockées offline
-    // Cette fonction sera développée dans la Phase 4
-    console.log('ℹ️ [SW] Sync des transactions - à implémenter en Phase 4');
-    return true;
-  } catch (error) {
-    console.error('❌ [SW] Erreur sync transactions:', error);
-    throw error;
-  }
-}
-
-// 📱 GESTION DES NOTIFICATIONS PUSH (préparation future)
 self.addEventListener('push', (event) => {
   console.log('📱 [SW] Notification push reçue');
   
@@ -464,4 +633,4 @@ self.addEventListener('push', (event) => {
   }
 });
 
-console.log('🚀 [SW] Service Worker EasyPOS chargé et prêt !');
+console.log('🚀 [SW] Service Worker EasyPOS chargé et prêt avec Background Sync!');
