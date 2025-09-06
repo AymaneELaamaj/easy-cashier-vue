@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { DataTable } from '@/components/ui/DataTable';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useArticles } from '@/hooks/useArticles';
+import { useAuth } from '@/hooks/useAuth';
 import { ArticleDTO } from '@/types/entities';
 import { Search, Plus, Package, ShoppingCart, DollarSign } from 'lucide-react';
 import { CreateArticleModal } from '@/components/articles/CreateArticleModal';
@@ -20,6 +21,12 @@ export function Articles() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  // Hook d'authentification pour vérifier les rôles
+  const { isAdmin, isSuperAdmin } = useAuth();
+  
+  // Vérifier si l'utilisateur peut gérer les articles (seulement ADMIN et SUPER_ADMIN)
+  const canManageArticles = isAdmin || isSuperAdmin;
 
   const {
     articles,
@@ -119,11 +126,12 @@ export function Articles() {
       header: 'Catégorie',
       render: (value: unknown, article: ArticleDTO) => (
         <div className="text-sm">
-          {article.categorie?.libelle || '-'}
+          {(article as any).categorie?.libelle || '-'}
         </div>
       ),
     },
-    {
+    // Colonne Actions - masquée pour les employés et caissiers
+    ...(canManageArticles ? [{
       key: 'actions',
       header: 'Actions',
       render: (value: unknown, article: ArticleDTO) => (
@@ -146,7 +154,7 @@ export function Articles() {
           </Button>
         </div>
       ),
-    },
+    }] : []),
   ];
 
   if (isLoading) return <LoadingSpinner />;
@@ -175,7 +183,7 @@ export function Articles() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Articles</h1>
           <p className="text-sm text-muted-foreground">
-            Gérez les articles et produits de votre système.
+            {canManageArticles ? 'Gérez les articles et produits de votre système.' : 'Consultez les articles disponibles.'}
           </p>
         </div>
         <div className="flex space-x-2">
@@ -188,10 +196,13 @@ export function Articles() {
             <Search className="h-4 w-4 mr-2" />
             {isLoading ? 'Chargement...' : 'Recharger'}
           </Button>
-          <Button size="sm" onClick={() => setShowCreateModal(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nouvel Article
-          </Button>
+          {/* Bouton Nouvel Article - masqué pour les employés et caissiers */}
+          {canManageArticles && (
+            <Button size="sm" onClick={() => setShowCreateModal(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nouvel Article
+            </Button>
+          )}
         </div>
       </div>
 
@@ -266,7 +277,7 @@ export function Articles() {
             <div>
               <CardTitle className="text-lg">Liste des Articles</CardTitle>
               <CardDescription className="text-sm">
-                Gérez tous vos articles et leur disponibilité.
+                {canManageArticles ? 'Gérez tous vos articles et leur disponibilité.' : 'Consultez tous les articles disponibles.'}
               </CardDescription>
             </div>
           </div>
@@ -277,12 +288,17 @@ export function Articles() {
               <Package className="h-16 w-16 text-muted-foreground" />
               <div className="text-lg font-semibold">Aucun article trouvé</div>
               <div className="text-muted-foreground text-center max-w-md">
-                Commencez par créer votre premier article en cliquant sur "Nouvel Article"
+                {canManageArticles 
+                  ? 'Commencez par créer votre premier article en cliquant sur "Nouvel Article"'
+                  : 'Aucun article n\'est disponible pour le moment.'
+                }
               </div>
-              <Button onClick={() => setShowCreateModal(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Créer le premier article
-              </Button>
+              {canManageArticles && (
+                <Button onClick={() => setShowCreateModal(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Créer le premier article
+                </Button>
+              )}
             </div>
           ) : (
             <DataTable
@@ -301,23 +317,27 @@ export function Articles() {
         </CardContent>
       </Card>
 
-      {/* Modals */}
-      <CreateArticleModal 
-        open={showCreateModal} 
-        onOpenChange={setShowCreateModal} 
-      />
-      
-      <EditArticleModal 
-        open={showEditModal} 
-        onOpenChange={setShowEditModal} 
-        article={selectedArticle} 
-      />
-      
-      <DeleteArticleModal 
-        open={showDeleteModal} 
-        onOpenChange={setShowDeleteModal} 
-        article={selectedArticle} 
-      />
+      {/* Modals - masqués pour les employés et caissiers */}
+      {canManageArticles && (
+        <>
+          <CreateArticleModal 
+            open={showCreateModal} 
+            onOpenChange={setShowCreateModal} 
+          />
+          
+          <EditArticleModal 
+            open={showEditModal} 
+            onOpenChange={setShowEditModal} 
+            article={selectedArticle} 
+          />
+          
+          <DeleteArticleModal 
+            open={showDeleteModal} 
+            onOpenChange={setShowDeleteModal} 
+            article={selectedArticle} 
+          />
+        </>
+      )}
     </div>
   );
 }

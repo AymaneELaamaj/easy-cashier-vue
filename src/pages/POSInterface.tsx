@@ -435,7 +435,7 @@ const networkStatus = useNetworkStatus();
               className="pl-9"
             />
           </div>
-          <Button variant="outline" onClick={refetchArticles} disabled={articlesLoading}>
+          <Button variant="outline" onClick={() => refetchArticles()} disabled={articlesLoading}>
             <RefreshCw className={`w-4 h-4 ${articlesLoading ? 'animate-spin' : ''}`} />
           </Button>
           <Badge variant="secondary" className="px-3 py-1">

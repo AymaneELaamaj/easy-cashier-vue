@@ -3,7 +3,6 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Package,
-  FolderOpen,
   Users,
   CreditCard,
   Receipt,
@@ -33,12 +32,7 @@ const menuItems = [
     icon: Package,
     roles: ['ADMIN', 'SUPER_ADMIN', 'EMPLOYE']
   },
-  {
-    title: 'Catégories',
-    url: '/categories',
-    icon: FolderOpen,
-    roles: ['ADMIN', 'SUPER_ADMIN']
-  },
+ 
   {
     title: 'Utilisateurs',
     url: '/users',
