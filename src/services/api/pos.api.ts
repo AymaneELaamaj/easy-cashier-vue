@@ -5,11 +5,18 @@ import { UtilisateurResponse, ArticleDTO } from '@/types/entities';
 const API_URL = import.meta.env.BASE_URL || 'http://localhost:8080';
 
 export interface CustomPaymentRequest {
-  userEmail: string;
+  // L'un des deux est requis côté appelant (backend accepte l'un OU l'autre)
+  userEmail?: string;
+  codeBadge?: string;
+
   articles: {
     articleId: number;
     quantite: number;
   }[];
+
+  terminalId?: string;
+  sessionId?: string;
+  notes?: string;
 }
 
 export interface CustomPaymentResponse {
@@ -50,104 +57,94 @@ export interface POSHealthResponse {
 
 export class POSApiService {
   private getAuthHeaders(): HeadersInit {
-    // Essayer plusieurs clés possibles pour le token
-    const token = localStorage.getItem('authToken') || 
-                  localStorage.getItem('token') || 
-                  localStorage.getItem('accessToken');
-    
-    console.log('🔐 Token pour API POS:', token ? 'Présent' : 'Absent');
-    
+    const token =
+      localStorage.getItem('authToken') ||
+      localStorage.getItem('token') ||
+      localStorage.getItem('accessToken');
+
     return {
       'Content-Type': 'application/json',
-      ...(token && { 'Authorization': `Bearer ${token}` }),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
   }
 
-  /**
-   * Obtenir les articles pour le POS
-   */
-  async getArticlesForPOS(): Promise<ApiResponse<ArticleDTO[]>> {
+  private async parseOrText(res: Response) {
+    const text = await res.text();
     try {
-      const response = await fetch(`${API_URL}/api/articles/products`, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Erreur API articles:', response.status, errorText);
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-
-      return response.json();
-    } catch (error) {
-      console.error('Erreur lors du chargement des articles POS:', error);
-      throw error;
+      return JSON.parse(text);
+    } catch {
+      return { message: text || res.statusText };
     }
   }
 
-  /**
-   * Valider un badge utilisateur
-   */
+  /** Obtenir les articles pour le POS */
+  async getArticlesForPOS(): Promise<ApiResponse<ArticleDTO[]>> {
+    const res = await fetch(`${API_URL}/api/articles/products`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    });
+
+    if (!res.ok) {
+      const err = await this.parseOrText(res);
+      throw new Error(`HTTP ${res.status}: ${err.message || 'Erreur articles POS'}`);
+    }
+
+    return res.json();
+  }
+
+  /** Valider un badge utilisateur */
   async validateBadge(codeBadge: string): Promise<ApiResponse<UtilisateurResponse>> {
-    const response = await fetch(
+    const res = await fetch(
       `${API_URL}/api/utilisateurs/badge?codeBadge=${encodeURIComponent(codeBadge)}`,
-      {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      }
+      { method: 'GET', headers: this.getAuthHeaders() }
     );
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    if (!res.ok) {
+      const err = await this.parseOrText(res);
+      throw new Error(`HTTP ${res.status}: ${err.message || 'Erreur badge'}`);
     }
 
-    return response.json();
+    return res.json();
   }
 
-  /**
-   * Valider une transaction POS
-   */
+  /** Valider une transaction POS (par email OU par codeBadge) */
   async validateTransaction(request: CustomPaymentRequest): Promise<CustomPaymentResponse> {
-    const response = await fetch(`${API_URL}/api/pos/validate`, {
+    const res = await fetch(`${API_URL}/api/pos/validate`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: JSON.stringify(request),
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || `HTTP ${response.status}`);
+    if (!res.ok) {
+      const err = await this.parseOrText(res);
+      throw new Error(err.message || `HTTP ${res.status}`);
     }
 
-    return response.json();
+    return res.json();
   }
 
-  /**
-   * Vérifier le statut de l'API POS
-   */
+  /** Health check */
   async healthCheck(): Promise<POSHealthResponse> {
-    const response = await fetch(`${API_URL}/api/pos/health`, {
+    const res = await fetch(`${API_URL}/api/pos/health`, {
       method: 'GET',
       headers: this.getAuthHeaders(),
     });
 
-    if (!response.ok) {
-      throw new Error(`Health check failed: HTTP ${response.status}`);
+    if (!res.ok) {
+      const err = await this.parseOrText(res);
+      throw new Error(`Health check failed: ${err.message || `HTTP ${res.status}`}`);
     }
 
-    return response.json();
+    return res.json();
   }
 
-  /**
-   * Obtenir le statut de connexion
-   */
+  /** Vérifier la connexion */
   async checkConnection(): Promise<boolean> {
     try {
       await this.healthCheck();
       return true;
-    } catch (error) {
-      console.error('Connection check failed:', error);
+    } catch (e) {
+      console.error('Connection check failed:', e);
       return false;
     }
   }

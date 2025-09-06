@@ -1,9 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+// src/hooks/usePOS.ts
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArticleDTO, UtilisateurResponse } from '@/types/entities';
 import { offlineApiService } from '@/services/OfflineApiService';
 import useNetworkStatus from './useNetworkStatus';
 import toast from 'react-hot-toast';
+import POS_FLAGS from '@/config/posFlags';
+import type { CustomPaymentResponse } from '@/services/api/pos.api';
 
 interface CartItem {
   article: ArticleDTO;
@@ -20,309 +23,244 @@ interface ValidationResult {
   fromCache?: boolean;
 }
 
-/**
- * Hook principal pour l'interface POS avec support offline
- * Utilise OfflineApiService pour la gestion automatique online/offline
- */
-export const usePOS = () => {
-  // États locaux
+export type UsePOSOptions = {
+  /** Callback exécuté à chaque transaction validée avec succès */
+  onTransactionSuccess?: (tx: CustomPaymentResponse) => void;
+};
+
+export const usePOS = (options: UsePOSOptions = {}) => {
+  // --- State -----------------------------------------------------------
   const [currentUser, setCurrentUser] = useState<UtilisateurResponse | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Hook de détection réseau
+  // --- Network status --------------------------------------------------
   const networkStatus = useNetworkStatus();
-
-  // Synchroniser l'état réseau avec OfflineApiService
   useEffect(() => {
     offlineApiService.updateConnectionStatus(networkStatus.isOnline);
   }, [networkStatus.isOnline]);
 
-  // Articles avec cache offline via React Query
-  const { data: articles = [], isLoading: articlesLoading, refetch: refetchArticles } = useQuery({
+  // --- Articles (cache offline via React Query) ------------------------
+  const {
+    data: articles = [],
+    isLoading: articlesLoading,
+    refetch: refetchArticles,
+  } = useQuery({
     queryKey: ['pos-articles'],
     queryFn: () => offlineApiService.getArticles(),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: (failureCount) => {
-      // Retry seulement si online
-      return networkStatus.isOnline && failureCount < 2;
-    },
-    refetchInterval: networkStatus.isOnline ? 30 * 60 * 1000 : false, // 30 min si online
+    staleTime: 5 * 60 * 1000,
+    retry: (failureCount) => networkStatus.isOnline && failureCount < 2,
+    refetchInterval: networkStatus.isOnline ? 30 * 60 * 1000 : false,
   });
 
-  // Validation badge avec cache offline
-  const validateBadge = useCallback(async (codeBadge: string): Promise<ValidationResult> => {
-    if (!codeBadge.trim()) {
-      return { success: false, error: 'Code badge requis' };
-    }
+  // --- Totaux (mémorisés) ----------------------------------------------
+  const cartTotal = useMemo(
+    () => cart.reduce((total, item) => total + item.sousTotal, 0),
+    [cart]
+  );
 
-    setIsLoading(true);
-    try {
-      const result = await offlineApiService.validateBadge(codeBadge);
-      
-      if (result.success && result.user) {
-        setCurrentUser(result.user);
-        
-        // Toast différent selon source
-        if (result.fromCache) {
-          toast.success(`Badge validé (mode offline)\n${result.user.prenom} ${result.user.nom}`, {
-            duration: 3000,
-            icon: '📱',
-          });
-        } else {
-          toast.success(`Badge validé\n${result.user.prenom} ${result.user.nom}`, {
-            duration: 2000,
-            icon: '✅',
-          });
-        }
-        
-        return { 
-          success: true, 
-          data: result.user,
-          fromCache: result.fromCache 
-        };
-      } else {
-        const errorMsg = result.error || 'Badge invalide';
-        toast.error(errorMsg, { 
-          duration: 3000,
-          icon: result.fromCache ? '📱' : '❌',
-        });
-        return { 
-          success: false, 
-          error: errorMsg,
-          fromCache: result.fromCache 
-        };
+  const estimatedSubvention = useMemo(
+    () => (currentUser ? cartTotal * 0.3 : 0),
+    [currentUser, cartTotal]
+  );
+
+  const estimatedToPay = useMemo(
+    () => cartTotal - estimatedSubvention,
+    [cartTotal, estimatedSubvention]
+  );
+
+  // --- validateTransaction (définie AVANT validateBadge) ---------------
+  const validateTransaction = useCallback(
+    async (opts?: { userOverride?: UtilisateurResponse }): Promise<ValidationResult> => {
+      const user = opts?.userOverride ?? currentUser;
+      if (!user || cart.length === 0) {
+        return { success: false, error: "Pas d'utilisateur ou panier vide" };
       }
-    } catch (error) {
-      console.error('Erreur validation badge:', error);
-      const errorMsg = 'Erreur lors de la validation du badge';
-      toast.error(errorMsg, { duration: 3000, icon: '⚠️' });
-      return { success: false, error: errorMsg, user: undefined };
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
 
-  // Validation transaction avec gestion offline
-  const validateTransaction = useCallback(async (): Promise<ValidationResult> => {
-    console.log("🔥 NOUVEAU CODE validateTransaction appelé");
+      setIsLoading(true);
+      try {
+        const result = await offlineApiService.createTransaction({
+          userEmail: user.email,
+          articles: cart.map((i) => ({ articleId: i.article.id!, quantite: i.quantite })),
+          utilisateur: user,
+          cartTotal,
+          estimatedSubvention,
+          estimatedToPay,
+          articleDetails: cart.map((i) => i.article),
+        });
 
-    if (!currentUser || cart.length === 0) {
-      return { success: false, error: 'Pas d\'utilisateur ou panier vide' };
-    }
+        if (result.success && result.data) {
+          setCart([]);
+          setCurrentUser(null);
 
-    setIsLoading(true);
-    try {
-      const result = await offlineApiService.createTransaction({
-        userEmail: currentUser.email,
-        articles: cart.map(item => ({
-          articleId: item.article.id!,
-          quantite: item.quantite,
-        })),
-        utilisateur: currentUser,
-        cartTotal,
-        estimatedSubvention,
-        estimatedToPay,
-        articleDetails: cart.map(item => item.article),
-      });
+          // ✅ Laissez le composant décider (ex: imprimer le ticket)
+          options.onTransactionSuccess?.(result.data as CustomPaymentResponse);
 
-      if (result.success && result.data) {
-        // Succès - nettoyer l'interface
-        setCart([]);
-        setCurrentUser(null);
-        
-        // Toast différent selon mode
-        if (result.isOffline) {
           toast.success(
-            `Transaction enregistrée (mode offline)\nTicket: ${result.data.numeroTicket}`,
-            {
-              duration: 4000,
-              icon: '📱',
-            }
+            `${result.isOffline ? 'Transaction enregistrée (mode offline)' : 'Transaction réussie'}\nTicket: ${result.data.numeroTicket}`,
+            { duration: result.isOffline ? 4000 : 3000, icon: result.isOffline ? '📱' : '✅' }
           );
-        } else {
-          toast.success(`Transaction réussie\nTicket: ${result.data.numeroTicket}`, {
-            duration: 3000,
-            icon: '✅',
-          });
-        }
-        
-        return { 
-          success: true, 
-          data: result.data,
-          isOffline: result.isOffline 
-        };
-      } else {
-        const errorMsg = result.error || 'Erreur lors de la transaction';
-        toast.error(errorMsg, { 
-          duration: 4000,
-          icon: result.isOffline ? '📱' : '❌',
-        });
-        return { 
-          success: false, 
-          error: errorMsg,
-          isOffline: result.isOffline 
-        };
-      }
-    } catch (error) {
-      console.error('Erreur validation transaction:', error);
-      const errorMsg = 'Erreur lors de la validation de la transaction';
-      toast.error(errorMsg, { duration: 4000, icon: '⚠️' });
-      return { success: false, error: errorMsg };
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentUser, cart]);
 
-  // Synchronisation automatique des transactions offline
+          return { success: true, data: result.data, isOffline: result.isOffline };
+        }
+
+        const msg = result.error || 'Erreur lors de la transaction';
+        toast.error(msg, { duration: 4000, icon: result.isOffline ? '📱' : '❌' });
+        return { success: false, error: msg, isOffline: result.isOffline };
+      } catch (e) {
+        console.error('Erreur validation transaction:', e);
+        const msg = 'Erreur lors de la validation de la transaction';
+        toast.error(msg, { duration: 4000, icon: '⚠️' });
+        return { success: false, error: msg };
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [currentUser, cart, cartTotal, estimatedSubvention, estimatedToPay, options]
+  );
+
+  // --- validateBadge (auto-achat si flag + panier non vide) -----------
+  const validateBadge = useCallback(
+    async (codeBadge: string): Promise<ValidationResult> => {
+      if (!codeBadge.trim()) {
+        return { success: false, error: 'Code badge requis' };
+      }
+
+      setIsLoading(true);
+      try {
+        const result = await offlineApiService.validateBadge(codeBadge);
+
+        if (result.success && result.user) {
+          setCurrentUser(result.user);
+
+          toast.success(
+            `Badge validé${result.fromCache ? ' (mode offline)' : ''}\n${result.user.prenom} ${result.user.nom}`,
+            { duration: result.fromCache ? 3000 : 2000, icon: result.fromCache ? '📱' : '✅' }
+          );
+
+          // Auto-validation après badge ?
+          const shouldAuto = POS_FLAGS.autoValidateAfterBadge && cart.length > 0;
+          const requiresOnline = POS_FLAGS.requireOnlineForAutoValidate && !networkStatus.isOnline;
+          const meetsMinTotal = cartTotal >= (POS_FLAGS.minCartTotalForAutoValidate ?? 0);
+
+          if (shouldAuto && !requiresOnline && meetsMinTotal) {
+            const delay = Math.max(0, POS_FLAGS.autoValidateDelayMs || 0);
+            await new Promise((res) => setTimeout(res, delay));
+            await validateTransaction({ userOverride: result.user });
+          }
+
+          return { success: true, data: result.user, fromCache: result.fromCache };
+        }
+
+        const errorMsg = result.error || 'Badge invalide';
+        toast.error(errorMsg, { duration: 3000, icon: result.fromCache ? '📱' : '❌' });
+        return { success: false, error: errorMsg, fromCache: result.fromCache };
+      } catch (e) {
+        console.error('Erreur validation badge:', e);
+        const msg = 'Erreur lors de la validation du badge';
+        toast.error(msg, { duration: 3000, icon: '⚠️' });
+        return { success: false, error: msg };
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [cart.length, cartTotal, networkStatus.isOnline, validateTransaction]
+  );
+
+  // --- Sync offline ----------------------------------------------------
   const syncOfflineTransactions = useCallback(async () => {
     if (!networkStatus.isOnline) {
-      toast.error('Impossible de synchroniser : pas de connexion', { 
-        duration: 3000,
-        icon: '📱' 
-      });
+      toast.error('Impossible de synchroniser : pas de connexion', { duration: 3000, icon: '📱' });
       return { synced: 0, failed: 0, errors: [] };
     }
 
     setIsLoading(true);
     try {
       const result = await offlineApiService.syncOfflineTransactions();
-      
+
       if (result.synced > 0) {
-        toast.success(
-          `${result.synced} transaction(s) synchronisée(s)`,
-          { duration: 3000, icon: '🔄' }
-        );
+        toast.success(`${result.synced} transaction(s) synchronisée(s)`, { duration: 3000, icon: '🔄' });
       }
-      
       if (result.failed > 0) {
-        toast.error(
-          `${result.failed} transaction(s) échouée(s)`,
-          { duration: 4000, icon: '⚠️' }
-        );
+        toast.error(`${result.failed} transaction(s) échouée(s)`, { duration: 4000, icon: '⚠️' });
       }
-      
       if (result.synced === 0 && result.failed === 0) {
-        toast('Aucune transaction à synchroniser', { 
-          duration: 2000,
-          icon: 'ℹ️' 
-        });
+        toast('Aucune transaction à synchroniser', { duration: 2000, icon: 'ℹ️' });
       }
-      
+
       return result;
-    } catch (error) {
-      console.error('Erreur synchronisation:', error);
-      toast.error('Erreur lors de la synchronisation', { 
-        duration: 4000,
-        icon: '⚠️' 
-      });
+    } catch (e) {
+      console.error('Erreur synchronisation:', e);
+      toast.error('Erreur lors de la synchronisation', { duration: 4000, icon: '⚠️' });
       return { synced: 0, failed: 0, errors: ['Erreur technique'] };
     } finally {
       setIsLoading(false);
     }
   }, [networkStatus.isOnline]);
 
-  // NOUVEAU : Fonction pour forcer la synchronisation avec background sync
-const forceSync = useCallback(async () => {
-  console.log('🔄 Synchronisation forcée demandée');
-  
-  const apiConnected = await networkStatus.testApiConnectivity();
-  if (!apiConnected) {
-    toast.error('Impossible de synchroniser : API non accessible', { 
-      duration: 3000,
-      icon: '📱' 
-    });
-    return { synced: 0, failed: 0, errors: ['API non accessible'] };
-  }
-
-  try {
-    if ('serviceWorker' in navigator && 'sync' in (window as any).ServiceWorkerRegistration.prototype) {
-      const registration = await navigator.serviceWorker.ready;
-      await (registration as any).sync.register('sync-offline-transactions');
-      
-      toast('Synchronisation programmée en arrière-plan', { 
-        duration: 2000,
-        icon: '🔄' 
-      });
-      
-      return { synced: 0, failed: 0, errors: [], backgroundSync: true };
+  const forceSync = useCallback(async () => {
+    const apiConnected = await networkStatus.testApiConnectivity();
+    if (!apiConnected) {
+      toast.error('Impossible de synchroniser : API non accessible', { duration: 3000, icon: '📱' });
+      return { synced: 0, failed: 0, errors: ['API non accessible'] };
     }
-  } catch (error) {
-    console.warn('Background sync échoué, fallback manuel:', error);
-  }
 
-  return await syncOfflineTransactions();
-}, [networkStatus.testApiConnectivity, syncOfflineTransactions]);
+    try {
+      if ('serviceWorker' in navigator && 'sync' in (window as any).ServiceWorkerRegistration.prototype) {
+        const registration = await navigator.serviceWorker.ready;
+        await (registration as any).sync.register('sync-offline-transactions');
+        toast('Synchronisation programmée en arrière-plan', { duration: 2000, icon: '🔄' });
+        return { synced: 0, failed: 0, errors: [], backgroundSync: true };
+      }
+    } catch (e) {
+      console.warn('Background sync échoué, fallback manuel:', e);
+    }
 
-  // Gestion du panier
+    return await syncOfflineTransactions();
+  }, [networkStatus.testApiConnectivity, syncOfflineTransactions]);
+
+  // --- Panier ----------------------------------------------------------
   const addToCart = useCallback((article: ArticleDTO) => {
     if (!article.disponible || !article.status) {
       toast.error('Article non disponible', { duration: 2000, icon: '❌' });
       return;
     }
 
-    setCart(prevCart => {
-      const existingItem = prevCart.find(item => item.article.id === article.id);
-      
-      if (existingItem) {
-        // Augmenter quantité
-        return prevCart.map(item =>
-          item.article.id === article.id
-            ? {
-                ...item,
-                quantite: item.quantite + 1,
-                sousTotal: (item.quantite + 1) * parseFloat(article.prix)
-              }
-            : item
+    setCart((prev) => {
+      const exists = prev.find((i) => i.article.id === article.id);
+      if (exists) {
+        return prev.map((i) =>
+          i.article.id === article.id
+            ? { ...i, quantite: i.quantite + 1, sousTotal: (i.quantite + 1) * parseFloat(article.prix) }
+            : i
         );
-      } else {
-        // Nouveau article
-        return [...prevCart, {
-          article,
-          quantite: 1,
-          sousTotal: parseFloat(article.prix)
-        }];
-      }
+    }
+      return [...prev, { article, quantite: 1, sousTotal: parseFloat(article.prix) }];
     });
-    
-    toast.success(`${article.nom} ajouté au panier`, { 
-      duration: 1500,
-      icon: '🛒' 
-    });
+
+    toast.success(`${article.nom} ajouté au panier`, { duration: 1500, icon: '🛒' });
   }, []);
 
   const updateQuantity = useCallback((articleId: number, newQuantity: number) => {
     if (newQuantity <= 0) {
-      removeFromCart(articleId);
+      setCart((prev) => prev.filter((i) => i.article.id !== articleId));
       return;
     }
-
-    setCart(prevCart =>
-      prevCart.map(item =>
-        item.article.id === articleId
-          ? {
-              ...item,
-              quantite: newQuantity,
-              sousTotal: newQuantity * parseFloat(item.article.prix)
-            }
-          : item
+    setCart((prev) =>
+      prev.map((i) =>
+        i.article.id === articleId
+          ? { ...i, quantite: newQuantity, sousTotal: newQuantity * parseFloat(i.article.prix) }
+          : i
       )
     );
   }, []);
 
   const removeFromCart = useCallback((articleId: number) => {
-    setCart(prevCart => {
-      const item = prevCart.find(item => item.article.id === articleId);
-      const newCart = prevCart.filter(item => item.article.id !== articleId);
-      
-      if (item) {
-        toast.success(`${item.article.nom} retiré du panier`, { 
-          duration: 1500,
-          icon: '🗑️' 
-        });
-      }
-      
-      return newCart;
+    setCart((prev) => {
+      const item = prev.find((i) => i.article.id === articleId);
+      const next = prev.filter((i) => i.article.id !== articleId);
+      if (item) toast.success(`${item.article.nom} retiré du panier`, { duration: 1500, icon: '🗑️' });
+      return next;
     });
   }, []);
 
@@ -339,132 +277,66 @@ const forceSync = useCallback(async () => {
     toast('Interface réinitialisée', { duration: 1500, icon: '🔄' });
   }, []);
 
-  // Calculs des totaux
-  const cartTotal = cart.reduce((total, item) => total + item.sousTotal, 0);
-  
-  // Estimation subvention (sera plus précise avec les vraies règles)
-  const estimatedSubvention = currentUser ? cartTotal * 0.3 : 0; // 30% par défaut
-  
-  const estimatedToPay = cartTotal - estimatedSubvention;
-
-  // Statistiques offline
+  // --- Offline stats (pour UI/auto-sync) -------------------------------
   const { data: offlineStats } = useQuery({
     queryKey: ['offline-stats'],
     queryFn: () => offlineApiService.getOfflineStats(),
-    refetchInterval: 30000, // Refresh toutes les 30 secondes
+    refetchInterval: 30000,
   });
 
-  // Écouter les messages du Service Worker pour les sync en arrière-plan
+  // --- Service Worker messages ----------------------------------------
   useEffect(() => {
-    const messageHandler = (event: MessageEvent) => {
-      const { type, payload } = event.data;
-      
-      switch (type) {
-        case 'SYNC_COMPLETE':
-          console.log('🔄 Background sync terminé:', payload);
-          if (payload.synced > 0) {
-            toast.success(
-              `${payload.synced} transaction(s) synchronisée(s) en arrière-plan`,
-              { duration: 3000, icon: '🔄' }
-            );
-          }
-          if (payload.failed > 0) {
-            toast.error(
-              `${payload.failed} transaction(s) échouée(s)`,
-              { duration: 4000, icon: '⚠️' }
-            );
-          }
-          break;
-        default:
-          console.log('Message SW non géré:', type);
+    const handler = (event: MessageEvent) => {
+      const { type, payload } = event.data || {};
+      if (type === 'SYNC_COMPLETE') {
+        if (payload?.synced > 0) {
+          toast.success(`${payload.synced} transaction(s) synchronisée(s) en arrière-plan`, {
+            duration: 3000,
+            icon: '🔄',
+          });
+        }
+        if (payload?.failed > 0) {
+          toast.error(`${payload.failed} transaction(s) échouée(s)`, { duration: 4000, icon: '⚠️' });
+        }
       }
     };
-
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.addEventListener('message', messageHandler);
-      
-      return () => {
-        navigator.serviceWorker.removeEventListener('message', messageHandler);
-      };
+      navigator.serviceWorker.addEventListener('message', handler);
+      return () => navigator.serviceWorker.removeEventListener('message', handler);
     }
   }, []);
 
-  // Écouter les événements de synchronisation du Service Worker
+  // --- Auto-sync à la reconnexion -------------------------------------
   useEffect(() => {
-    const handleSwSyncComplete = (event: CustomEvent) => {
-      const { synced, failed, errors } = event.detail;
-      
-      if (synced > 0) {
-        toast.success(
-          `${synced} transaction(s) synchronisée(s) en arrière-plan`,
-          { duration: 3000, icon: '🔄' }
-        );
-      }
-      
-      if (failed > 0) {
-        toast.error(
-          `${failed} transaction(s) échouée(s) lors de la sync`,
-          { duration: 4000, icon: '⚠️' }
-        );
-      }
-    };
+    let t: ReturnType<typeof setTimeout> | undefined;
 
-    const handleSwSyncError = (event: CustomEvent) => {
-      const { error } = event.detail;
-      toast.error(`Erreur synchronisation: ${error}`, { 
-        duration: 4000, 
-        icon: '❌' 
-      });
-    };
+    if (networkStatus.isOnline && networkStatus.lastOnlineAt) {
+      const pending = offlineStats?.pendingTransactions && offlineStats.pendingTransactions > 0;
+      if (pending) {
+        toast('Reconnexion détectée - Synchronisation en cours...', { duration: 2000, icon: '🌐' });
 
-    window.addEventListener('swSyncComplete', handleSwSyncComplete as EventListener);
-    window.addEventListener('swSyncError', handleSwSyncError as EventListener);
-    
-    return () => {
-      window.removeEventListener('swSyncComplete', handleSwSyncComplete as EventListener);
-      window.removeEventListener('swSyncError', handleSwSyncError as EventListener);
-    };
-  }, []);
-
-  // Synchronisation automatique améliorée à la reconnexion
-useEffect(() => {
-  let reconnectionTimer: NodeJS.Timeout;
-  
-  if (networkStatus.isOnline && networkStatus.lastOnlineAt) {
-    const shouldAutoSync = offlineStats?.pendingTransactions && offlineStats.pendingTransactions > 0;
-    
-    if (shouldAutoSync) {
-      console.log('🔄 Reconnexion détectée avec transactions en attente');
-      
-      toast('Reconnexion détectée - Synchronisation en cours...', { 
-        duration: 2000,
-        icon: '🌐' 
-      });
-      
-      reconnectionTimer = setTimeout(async () => {
-        try {
-          if ('serviceWorker' in navigator && 'sync' in (window as any).ServiceWorkerRegistration.prototype) {
-            const registration = await navigator.serviceWorker.ready;
-            await (registration as any).sync.register('sync-offline-transactions');
-            console.log('✅ Background sync programmé pour reconnexion');
-          } else {
-            console.log('⚠️ Background sync non supporté - synchronisation manuelle');
+        t = setTimeout(async () => {
+          try {
+            if ('serviceWorker' in navigator && 'sync' in (window as any).ServiceWorkerRegistration.prototype) {
+              const registration = await navigator.serviceWorker.ready;
+              await (registration as any).sync.register('sync-offline-transactions');
+            } else {
+              await syncOfflineTransactions();
+            }
+          } catch (e) {
+            console.error('Erreur auto-sync:', e);
             await syncOfflineTransactions();
           }
-        } catch (error) {
-          console.error('❌ Erreur auto-sync:', error);
-          await syncOfflineTransactions();
-        }
-      }, 2000);
+        }, 2000);
+      }
     }
-  }
-  
-  return () => {
-    if (reconnectionTimer) {
-      clearTimeout(reconnectionTimer);
-    }
-  };
-}, [networkStatus.isOnline, networkStatus.lastOnlineAt, offlineStats?.pendingTransactions, syncOfflineTransactions]);
+
+    return () => {
+      if (t) clearTimeout(t);
+    };
+  }, [networkStatus.isOnline, networkStatus.lastOnlineAt, offlineStats?.pendingTransactions, syncOfflineTransactions]);
+
+  // --- Return API ------------------------------------------------------
   return {
     // États
     currentUser,
@@ -472,35 +344,35 @@ useEffect(() => {
     isLoading,
     articles,
     articlesLoading,
-    
-    // Statut réseau et offline
+
+    // Réseau / offline
     networkStatus,
     offlineStats,
-    
+
     // Actions principales
     validateBadge,
     validateTransaction,
     syncOfflineTransactions,
-    forceSync, // NOUVEAU
-    
-    // Actions panier
+    forceSync,
+
+    // Panier
     addToCart,
     updateQuantity,
     removeFromCart,
     clearCart,
-    
-    // Actions générales
+
+    // Divers
     resetAll,
     setCurrentUser,
     refetchArticles,
-    
+
     // Calculs
     cartTotal,
     estimatedSubvention,
     estimatedToPay,
-    
+
     // Flags utiles
-    canValidateTransaction: currentUser && cart.length > 0,
+    canValidateTransaction: Boolean(currentUser) && cart.length > 0,
     hasOfflineTransactions: (offlineStats?.pendingTransactions || 0) > 0,
     isOnline: networkStatus.isOnline,
   };
