@@ -1,3 +1,4 @@
+// src/hooks/useNetworkStatus.ts
 import { useState, useEffect, useCallback } from 'react';
 
 export interface NetworkStatus {
@@ -12,10 +13,6 @@ interface NetworkEventDetail {
   isOnline: boolean;
 }
 
-/**
- * Hook pour surveiller l'état de la connexion réseau
- * Détecte online/offline + vitesse de connexion
- */
 export const useNetworkStatus = () => {
   const [networkStatus, setNetworkStatus] = useState<NetworkStatus>({
     isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
@@ -25,23 +22,43 @@ export const useNetworkStatus = () => {
     lastOfflineAt: null,
   });
 
-  // Test de ping vers votre API pour vérifier la connectivité réelle
-  const testApiConnectivity = useCallback(async (): Promise<boolean> => {
-    if (!navigator.onLine) {
-      return false;
-    }
+  // Récupère le token sans toucher au .env
+  const getToken = () =>
+    localStorage.getItem('authToken') ||
+    localStorage.getItem('token') ||
+    localStorage.getItem('accessToken') ||
+    sessionStorage.getItem('authToken') ||
+    sessionStorage.getItem('token') ||
+    sessionStorage.getItem('accessToken') ||
+    null;
 
+  const testApiConnectivity = useCallback(async (): Promise<boolean> => {
+    if (!navigator.onLine) return false;
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/pos/health`, {
-        method: 'GET',
-        signal: controller.signal,
-        cache: 'no-cache',
-      });
+      const token = getToken();
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}/pos/health`,
+        {
+          method: 'GET',
+          signal: controller.signal,
+          cache: 'no-cache',
+          credentials: 'include',
+          headers: {
+            Accept: 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        }
+      );
 
       clearTimeout(timeoutId);
+      // Si 401 → on considère "offline auth" pour ne pas casser l’UX
+      if (response.status === 401) {
+        console.warn('[Network] /pos/health → 401 (token manquant/expiré)');
+        return false;
+      }
       return response.ok;
     } catch (error) {
       console.log('API connectivity test failed:', error);
@@ -49,36 +66,23 @@ export const useNetworkStatus = () => {
     }
   }, []);
 
-  // Détecter la vitesse de connexion
   const detectConnectionSpeed = useCallback((): { isSlowConnection: boolean; connectionType: string } => {
-    // @ts-ignore - navigator.connection peut ne pas être typé
+    // @ts-ignore
     const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-    
     if (connection) {
       const effectiveType = connection.effectiveType;
       const isSlowConnection = effectiveType === 'slow-2g' || effectiveType === '2g';
-      
-      return {
-        isSlowConnection,
-        connectionType: effectiveType || 'unknown'
-      };
+      return { isSlowConnection, connectionType: effectiveType || 'unknown' };
     }
-
-    return {
-      isSlowConnection: false,
-      connectionType: 'unknown'
-    };
+    return { isSlowConnection: false, connectionType: 'unknown' };
   }, []);
 
-  // Gérer les changements d'état réseau
   const updateNetworkStatus = useCallback(async (isOnline: boolean) => {
     console.log(`Network status changed: ${isOnline ? 'ONLINE' : 'OFFLINE'}`);
-    
-    // Test API seulement si navigator.onLine indique online
     const apiConnected = isOnline ? await testApiConnectivity() : false;
     const { isSlowConnection, connectionType } = detectConnectionSpeed();
 
-    setNetworkStatus(prev => ({
+    setNetworkStatus((prev) => ({
       ...prev,
       isOnline: apiConnected,
       isSlowConnection: apiConnected ? isSlowConnection : false,
@@ -89,14 +93,10 @@ export const useNetworkStatus = () => {
   }, [testApiConnectivity, detectConnectionSpeed]);
 
   useEffect(() => {
-    // État initial
     updateNetworkStatus(navigator.onLine);
 
-    // Écouter les événements navigateur
     const handleOnline = () => updateNetworkStatus(true);
     const handleOffline = () => updateNetworkStatus(false);
-
-    // Écouter l'événement personnalisé du main.tsx
     const handleNetworkChange = (event: CustomEvent<NetworkEventDetail>) => {
       updateNetworkStatus(event.detail.isOnline);
     };
@@ -105,7 +105,6 @@ export const useNetworkStatus = () => {
     window.addEventListener('offline', handleOffline);
     window.addEventListener('networkStatusChange', handleNetworkChange as EventListener);
 
-    // Test périodique de connectivité (toutes les 30 secondes)
     const connectivityInterval = setInterval(async () => {
       if (navigator.onLine) {
         const apiConnected = await testApiConnectivity();
@@ -115,16 +114,14 @@ export const useNetworkStatus = () => {
       }
     }, 30000);
 
-    // Nettoyage
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('networkStatusChange', handleNetworkChange as EventListener);
       clearInterval(connectivityInterval);
     };
-  }, [updateNetworkStatus, networkStatus.isOnline]);
+  }, [updateNetworkStatus, networkStatus.isOnline, testApiConnectivity]);
 
-  // Fonctions utilitaires
   const forceRefreshNetworkStatus = useCallback(() => {
     updateNetworkStatus(navigator.onLine);
   }, [updateNetworkStatus]);
@@ -138,32 +135,23 @@ export const useNetworkStatus = () => {
 
   const getTimeSinceLastConnection = useCallback((): string | null => {
     if (networkStatus.isOnline || !networkStatus.lastOfflineAt) return null;
-
     const now = new Date();
     const diffMs = now.getTime() - networkStatus.lastOfflineAt.getTime();
     const diffMinutes = Math.floor(diffMs / (1000 * 60));
-    
-    if (diffMinutes < 1) return 'À l\'instant';
+    if (diffMinutes < 1) return "À l'instant";
     if (diffMinutes < 60) return `${diffMinutes} min ago`;
-    
     const diffHours = Math.floor(diffMinutes / 60);
     if (diffHours < 24) return `${diffHours}h ago`;
-    
     const diffDays = Math.floor(diffHours / 24);
     return `${diffDays}j ago`;
   }, [networkStatus]);
 
   return {
-    // État principal
     ...networkStatus,
-    
-    // Fonctions utilitaires
     forceRefreshNetworkStatus,
     getConnectionQuality,
     getTimeSinceLastConnection,
     testApiConnectivity,
-    
-    // Flags pratiques pour l'UI
     canMakeApiCalls: networkStatus.isOnline,
     shouldShowOfflineWarning: !networkStatus.isOnline,
     shouldShowSlowConnectionWarning: networkStatus.isOnline && networkStatus.isSlowConnection,
