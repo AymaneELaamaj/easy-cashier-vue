@@ -628,14 +628,8 @@ const POSInterface: React.FC = () => {
                 <span>Total articles:</span>
                 <span className="font-semibold">{cartTotal.toFixed(2)} MAD</span>
               </div>
-              <div className="flex justify-between text-green-600">
-                <span>Subvention estimée:</span>
-                <span className="font-medium">-{estimatedSubvention.toFixed(2)} MAD</span>
-              </div>
-              <div className="flex justify-between text-lg font-bold border-t pt-2">
-                <span>À débiter du badge:</span>
-                <span className="text-blue-600">{estimatedToPay.toFixed(2)} MAD</span>
-              </div>
+              
+             
             </div>
 
             {currentUser && currentUser.solde < 0 && (
