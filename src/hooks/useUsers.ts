@@ -3,6 +3,8 @@ import { usersAPI } from '@/services/api/users.api';
 import { UtilisateurResponse, UtilisateurRequest } from '@/types/entities';
 import { Pageable } from '@/types/api';
 import toast from 'react-hot-toast';
+import { useState, useEffect } from 'react';
+
 
 export const useUsers = (pageable?: Pageable) => {
   const queryClient = useQueryClient();
@@ -227,6 +229,36 @@ export const useEmployeesWithoutBadge = () => {
     },
     staleTime: 2 * 60 * 1000,
   });
+};
+
+// Hook pour la recherche d'utilisateurs
+export const useUserSearch = () => {
+  const [term, setTerm] = useState('');
+  const [debounced, setDebounced] = useState('');
+
+  // Debounce pour éviter de spam l'API
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(term.trim()), 300);
+    return () => clearTimeout(id);
+  }, [term]);
+
+  const { data, isFetching } = useQuery<UtilisateurResponse[]>({
+    queryKey: ['users', 'search', debounced],
+    queryFn: async () => {
+      const page = await usersAPI.searchUsers(debounced);
+      // L’API renvoie un Page<UtilisateurResponse>, on aplatit en tableau
+      return page?.content ?? [];
+    },
+    enabled: debounced.length >= 2, // lancer la recherche à partir de 2 lettres
+    staleTime: 60_000,
+  });
+
+  return {
+    term,
+    setTerm,
+    results: data ?? [],
+    loading: isFetching,
+  };
 };
 
 export default useUsers;
