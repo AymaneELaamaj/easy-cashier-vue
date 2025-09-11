@@ -2,18 +2,15 @@
 import { ApiResponse } from '@/types/api';
 import { UtilisateurResponse, ArticleDTO } from '@/types/entities';
 
-const API_URL = import.meta.env.BASE_URL || 'http://localhost:8080';
+const API_BASE: string =
+  (import.meta as any).env?.VITE_API_BASE_URL ||
+  (import.meta as any).env?.VITE_API_URL ||
+  '/api';
 
 export interface CustomPaymentRequest {
-  // L'un des deux est requis côté appelant (backend accepte l'un OU l'autre)
   userEmail?: string;
   codeBadge?: string;
-
-  articles: {
-    articleId: number;
-    quantite: number;
-  }[];
-
+  articles: { articleId: number; quantite: number }[];
   terminalId?: string;
   sessionId?: string;
   notes?: string;
@@ -31,9 +28,9 @@ export interface CustomPaymentResponse {
   partSalariale: number;
   partPatronale: number;
   soldeActuel: number;
-  nouveauSolde: number;
+  nouveauSolde: number; // 🔧 utilisé par le ticket & la MAJ cache
   numeroTicket: string;
-  transactionId: number;
+  transactionId: number | string;
   articles: Array<{
     articleId: number;
     nom: string;
@@ -55,99 +52,74 @@ export interface POSHealthResponse {
   version: string;
 }
 
-export class POSApiService {
+class POSApiService {
   private getAuthHeaders(): HeadersInit {
     const token =
       localStorage.getItem('authToken') ||
       localStorage.getItem('token') ||
-      localStorage.getItem('accessToken');
-
+      localStorage.getItem('accessToken') ||
+      sessionStorage.getItem('authToken') ||
+      sessionStorage.getItem('token') ||
+      sessionStorage.getItem('accessToken') ||
+      null;
     return {
+      Accept: 'application/json',
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(token ? { Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}` } : {}),
     };
   }
 
   private async parseOrText(res: Response) {
     const text = await res.text();
-    try {
-      return JSON.parse(text);
-    } catch {
-      return { message: text || res.statusText };
-    }
+    try { return JSON.parse(text); } catch { return { message: text || res.statusText }; }
   }
 
-  /** Obtenir les articles pour le POS */
+  // 🔧 utilitaire d’unwrap
+  private unwrap<T>(payload: any): T {
+    if (payload?.data !== undefined) return payload.data as T;
+    return payload as T;
+  }
+
   async getArticlesForPOS(): Promise<ApiResponse<ArticleDTO[]>> {
-    const res = await fetch(`${API_URL}/api/articles/products`, {
-      method: 'GET',
-      headers: this.getAuthHeaders(),
+    const res = await fetch(`${API_BASE}/articles/products`, {
+      method: 'GET', headers: this.getAuthHeaders(), credentials: 'include', mode: 'cors',
     });
-
-    if (!res.ok) {
-      const err = await this.parseOrText(res);
-      throw new Error(`HTTP ${res.status}: ${err.message || 'Erreur articles POS'}`);
-    }
-
+    if (!res.ok) { const err = await this.parseOrText(res); throw new Error(`HTTP ${res.status}: ${err.message || 'Erreur articles POS'}`); }
     return res.json();
   }
 
-  /** Valider un badge utilisateur */
   async validateBadge(codeBadge: string): Promise<ApiResponse<UtilisateurResponse>> {
-    const res = await fetch(
-      `${API_URL}/api/utilisateurs/badge?codeBadge=${encodeURIComponent(codeBadge)}`,
-      { method: 'GET', headers: this.getAuthHeaders() }
-    );
-
-    if (!res.ok) {
-      const err = await this.parseOrText(res);
-      throw new Error(`HTTP ${res.status}: ${err.message || 'Erreur badge'}`);
-    }
-
+    const res = await fetch(`${API_BASE}/utilisateurs/badge?codeBadge=${encodeURIComponent(codeBadge)}`, {
+      method: 'GET', headers: this.getAuthHeaders(), credentials: 'include', mode: 'cors',
+    });
+    if (!res.ok) { const err = await this.parseOrText(res); throw new Error(`HTTP ${res.status}: ${err.message || 'Erreur badge'}`); }
     return res.json();
   }
 
-  /** Valider une transaction POS (par email OU par codeBadge) */
+  // 🔧 retourne toujours directement le CustomPaymentResponse (unwrap .data si présent)
   async validateTransaction(request: CustomPaymentRequest): Promise<CustomPaymentResponse> {
-    const res = await fetch(`${API_URL}/api/pos/validate`, {
-      method: 'POST',
-      headers: this.getAuthHeaders(),
+    const res = await fetch(`${API_BASE}/pos/validate`, {
+      method: 'POST', headers: this.getAuthHeaders(), credentials: 'include', mode: 'cors',
       body: JSON.stringify(request),
     });
-
-    if (!res.ok) {
-      const err = await this.parseOrText(res);
-      throw new Error(err.message || `HTTP ${res.status}`);
-    }
-
-    return res.json();
+    const raw = await this.parseOrText(res);
+    if (!res.ok) { throw new Error(raw?.message || `HTTP ${res.status}`); }
+    const unwrapped = this.unwrap<CustomPaymentResponse>(raw);
+    return unwrapped;
   }
 
-  /** Health check */
   async healthCheck(): Promise<POSHealthResponse> {
-    const res = await fetch(`${API_URL}/api/pos/health`, {
-      method: 'GET',
-      headers: this.getAuthHeaders(),
+    const res = await fetch(`${API_BASE}/pos/health`, {
+      method: 'GET', headers: this.getAuthHeaders(), credentials: 'include', mode: 'cors',
     });
-
-    if (!res.ok) {
-      const err = await this.parseOrText(res);
-      throw new Error(`Health check failed: ${err.message || `HTTP ${res.status}`}`);
-    }
-
+    if (!res.ok) { const err = await this.parseOrText(res); throw new Error(`Health check failed: ${err.message || `HTTP ${res.status}`}`); }
     return res.json();
   }
 
-  /** Vérifier la connexion */
   async checkConnection(): Promise<boolean> {
-    try {
-      await this.healthCheck();
-      return true;
-    } catch (e) {
-      console.error('Connection check failed:', e);
-      return false;
-    }
+    try { await this.healthCheck(); return true; } catch (e) { console.error('Connection check failed:', e); return false; }
   }
 }
 
 export const posApiService = new POSApiService();
+export default posApiService;

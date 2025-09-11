@@ -1,6 +1,6 @@
+// src/hooks/useConfigs.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import configAPI from '@/services/api/config.api';
-import { ConfigPaiementDTO } from '@/types/entities';
+import configAPI, { ConfigPaiementDTO } from '@/services/api/config.api';
 import toast from 'react-hot-toast';
 
 export const useConfigs = () => {
@@ -12,10 +12,15 @@ export const useConfigs = () => {
     staleTime: 2 * 60 * 1000,
   });
 
+  const invalidateAll = () => {
+    qc.invalidateQueries({ queryKey: ['configs'] });
+    qc.invalidateQueries({ queryKey: ['payment-mode'] }); // ← pour que le POS voie le nouveau mode
+  };
+
   const createConfigMutation = useMutation({
     mutationFn: (payload: ConfigPaiementDTO) => configAPI.createConfig(payload),
     onSuccess: (newCfg) => {
-      qc.invalidateQueries({ queryKey: ['configs'] });
+      invalidateAll();
       toast.success(`Type de paiement défini: ${newCfg.typePaiement}`);
     },
     onError: (e: any) => {
@@ -28,7 +33,7 @@ export const useConfigs = () => {
     mutationFn: ({ id, data }: { id: number; data: ConfigPaiementDTO }) =>
       configAPI.updateConfig(id, data),
     onSuccess: (updated) => {
-      qc.invalidateQueries({ queryKey: ['configs'] });
+      invalidateAll();
       toast.success(`Type de paiement mis à jour: ${updated.typePaiement}`);
     },
     onError: (e: any) => {
@@ -40,7 +45,7 @@ export const useConfigs = () => {
   const deleteConfigMutation = useMutation({
     mutationFn: (id: number) => configAPI.deleteConfig(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['configs'] });
+      invalidateAll();
       toast.success('Configuration supprimée');
     },
     onError: (e: any) => {

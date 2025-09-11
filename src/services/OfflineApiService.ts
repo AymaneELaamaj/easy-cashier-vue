@@ -23,6 +23,8 @@ interface OfflineTransaction {
     montantTotal: number;
     subventionTotale: number;
     partSalariale: number;
+    quantiteAvecSubvention?: number;
+    quantiteSansSubvention?: number;
   }>;
   utilisateur: {
     id: number;
@@ -38,6 +40,10 @@ interface OfflineTransaction {
   syncError?: string;
 }
 
+export type CreateTransactionResult =
+  | { success: true; data: any; isOffline: boolean }
+  | { success: false; error: string; isOffline: boolean };
+
 class OfflineApiService {
   private config: OfflineApiConfig = {
     isOnline: true,
@@ -50,23 +56,18 @@ class OfflineApiService {
   constructor() {
     indexedDBService
       .init()
-      .then(() => {
-        this.dbReady = true;
-      })
+      .then(() => { this.dbReady = true; })
       .catch((e) => console.warn('[OfflineAPI] IndexedDB init error:', e));
   }
 
-  /** Mettre à jour l'état de connexion */
+  // ---------- Connexion ----------
   updateConnectionStatus(isOnline: boolean) {
     console.log(`[OfflineAPI] État connexion mis à jour: ${isOnline ? 'ONLINE' : 'OFFLINE'}`);
     this.config.isOnline = isOnline;
   }
 
-  // -------------------- UTILITAIRES HTTP/AUTH --------------------------
-
+  // ---------- HTTP / Auth ----------
   private getApiBase(): string {
-    // Garde tes variables .env telles quelles (pas de modification obligatoire)
-    // On supporte les deux si jamais les deux existent.
     return (import.meta as any).env?.VITE_API_BASE_URL ||
            (import.meta as any).env?.VITE_API_URL ||
            '/api';
@@ -82,12 +83,10 @@ class OfflineApiService {
       sessionStorage.getItem('accessToken') ||
       null;
 
-    // Fallback cookie "token"
     if (!t && typeof document !== 'undefined') {
       const m = document.cookie.match(/(?:^|;\s*)token=([^;]+)/);
       if (m) t = decodeURIComponent(m[1]);
     }
-
     return t;
   }
 
@@ -107,22 +106,16 @@ class OfflineApiService {
     if (token) {
       headers['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
     }
-    // Log court pour debug
     console.log('[OfflineAPI] Authorization header:', this.previewAuthForLogs());
     return headers;
   }
 
-  // ✅ Une seule propriété `headers`, fusion propre avec extra.headers
   private fetchOpts(extra?: RequestInit): RequestInit {
     const baseHeaders = this.getAuthHeaders();
-    const mergedHeaders: HeadersInit = {
-      ...baseHeaders,
-      ...(extra?.headers as HeadersInit | undefined),
-    };
+    const mergedHeaders: HeadersInit = { ...baseHeaders, ...(extra?.headers as HeadersInit | undefined) };
     const { headers: _ignored, ...restExtra } = extra || {};
-
     return {
-      credentials: 'include', // utile si session cookie
+      credentials: 'include',
       mode: 'cors',
       cache: 'no-store',
       ...restExtra,
@@ -130,14 +123,43 @@ class OfflineApiService {
     };
   }
 
-  // -------------------- ARTICLES ---------------------------------------
+  // ---------- util JSON ----------
+  private async parseOrText(res: Response) {
+    const text = await res.text();
+    try { return JSON.parse(text); } catch { return { message: text || res.statusText }; }
+  }
+  private unwrap<T>(payload: any): T {
+    if (payload?.data !== undefined) return payload.data as T;
+    return payload as T;
+  }
 
+  // ---------- helpers financiers ----------
+  private round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+  private fallbackSubRate = 0.30; // 30% en secours si estimatedSubvention == 0
+
+  /** Répartit la subvention totale proportionnellement au montant des lignes */
+  private distributeSubvention(
+    lines: Array<{ montantTotal: number }>,
+    totalCart: number,
+    totalSubvention: number
+  ): number[] {
+    if (totalSubvention <= 0 || totalCart <= 0) return lines.map(() => 0);
+    const raw = lines.map(l => (l.montantTotal / totalCart) * totalSubvention);
+    const sumRaw = raw.reduce((a, b) => a + b, 0);
+    const diff = totalSubvention - sumRaw;
+    if (Math.abs(diff) > 1e-6) {
+      const idx = lines.reduce((imax, l, i, arr) => l.montantTotal > arr[imax].montantTotal ? i : imax, 0);
+      raw[idx] += diff;
+    }
+    return raw.map(this.round2);
+  }
+
+  // -------------------- ARTICLES ---------------------------------------
   async getArticles(): Promise<ArticleDTO[]> {
     console.log('[OfflineAPI] Récupération articles...');
     try {
       if (this.config.isOnline) {
         const response = await fetch(`${this.getApiBase()}/articles/products`, this.fetchOpts());
-
         if (response.ok) {
           const data = await response.json();
           const articles = this.extractArticlesFromApiResponse(data);
@@ -147,14 +169,12 @@ class OfflineApiService {
           }
           return articles;
         }
-
         if (response.status === 401) {
           console.warn('[OfflineAPI] 401 Unauthorized sur /articles/products → fallback cache');
           return this.getCachedArticles();
         }
         throw new Error(`API Error: ${response.status}`);
       }
-
       console.log('[OfflineAPI] Mode offline - lecture cache articles');
       return this.getCachedArticles();
     } catch (error) {
@@ -164,7 +184,6 @@ class OfflineApiService {
   }
 
   // -------------------- BADGE ------------------------------------------
-
   async validateBadge(codeBadge: string): Promise<{
     success: boolean;
     user?: UtilisateurResponse;
@@ -186,7 +205,7 @@ class OfflineApiService {
 
       if (response.ok) {
         const result = await response.json();
-        const user = result.data;
+        const user = result.data ?? result;
 
         if (this.dbReady) {
           await indexedDBService.cacheUser({
@@ -220,7 +239,6 @@ class OfflineApiService {
   }
 
   // -------------------- TRANSACTION ------------------------------------
-
   async createTransaction(transactionData: {
     userEmail: string;
     articles: Array<{ articleId: number; quantite: number }>;
@@ -229,7 +247,7 @@ class OfflineApiService {
     estimatedSubvention: number;
     estimatedToPay: number;
     articleDetails: ArticleDTO[];
-  }): Promise<{ success: boolean; data?: any; error?: string; isOffline?: boolean }> {
+  }): Promise<CreateTransactionResult> {
     console.log('[OfflineAPI] Création transaction...');
 
     if (!this.config.isOnline) {
@@ -249,17 +267,24 @@ class OfflineApiService {
         })
       );
 
-      if (response.ok) {
-        const result = await response.json();
-        return { success: true, data: result, isOffline: false };
+      const raw = await this.parseOrText(response);
+      if (!response.ok) {
+        if (response.status === 401) {
+          console.warn('[OfflineAPI] 401 Unauthorized sur /pos/validate → bascule en offline');
+          return this.createOfflineTransaction(transactionData);
+        }
+        throw new Error(raw?.message || `API Error: ${response.status}`);
       }
 
-      if (response.status === 401) {
-        console.warn('[OfflineAPI] 401 Unauthorized sur /pos/validate → bascule en offline');
-        return this.createOfflineTransaction(transactionData);
+      // Normalisation légère si l'API ne met pas subvention/partSalariale par ligne
+      const data = this.unwrap<any>(raw);
+      this.normalizeTransactionArticles(data);
+
+      if (this.dbReady && typeof data?.nouveauSolde === 'number') {
+        await this.updateCachedUserBalance(transactionData.utilisateur.codeBadge, data.nouveauSolde);
       }
 
-      throw new Error(`API Error: ${response.status}`);
+      return { success: true, data, isOffline: false };
     } catch (error) {
       console.warn('[OfflineAPI] Erreur API transaction, stockage offline:', error);
       return this.createOfflineTransaction(transactionData);
@@ -267,7 +292,6 @@ class OfflineApiService {
   }
 
   // -------------------- SYNC OFFLINE -----------------------------------
-
   async syncOfflineTransactions(): Promise<{ synced: number; failed: number; errors: string[] }> {
     console.log('[OfflineAPI] Début synchronisation transactions offline...');
 
@@ -302,15 +326,23 @@ class OfflineApiService {
           })
         );
 
-        if (response.ok) {
-          if (this.dbReady) {
-            await indexedDBService.updateTransactionSyncStatus(transaction.tempId, 'SYNCED');
-          }
-          synced++;
-          console.log(`[OfflineAPI] Transaction ${transaction.tempId} synchronisée`);
-        } else {
-          throw new Error(`API Error: ${response.status}`);
+        const raw = await this.parseOrText(response);
+        if (!response.ok) {
+          throw new Error(raw?.message || `API Error: ${response.status}`);
         }
+
+        const data = this.unwrap<any>(raw);
+        this.normalizeTransactionArticles(data);
+
+        if (this.dbReady && typeof data?.nouveauSolde === 'number') {
+          await this.updateCachedUserBalance(transaction.utilisateur.codeBadge, data.nouveauSolde);
+        }
+
+        if (this.dbReady) {
+          await indexedDBService.updateTransactionSyncStatus(transaction.tempId, 'SYNCED');
+        }
+        synced++;
+        console.log(`[OfflineAPI] Transaction ${transaction.tempId} synchronisée`);
       } catch (error: any) {
         if (this.dbReady) {
           await indexedDBService.updateTransactionSyncStatus(
@@ -334,7 +366,6 @@ class OfflineApiService {
   }
 
   // -------------------- STATS ------------------------------------------
-
   async getOfflineStats(): Promise<{
     cachedArticles: number;
     cachedUsers: number;
@@ -360,7 +391,6 @@ class OfflineApiService {
   }
 
   // -------------------- SW TOKEN / BG SYNC -----------------------------
-
   async sendAuthTokenToServiceWorker(): Promise<void> {
     if (!('serviceWorker' in navigator)) return;
     try {
@@ -416,7 +446,54 @@ class OfflineApiService {
     }
   }
 
-  // -------------------- PRIVÉ : Transformations & Cache ----------------
+  // -------------------- PRIVÉS : helpers & cache -----------------------
+  private async updateCachedUserBalance(codeBadge: string, newBalance: number) {
+    try {
+      if (!this.dbReady) return;
+      const u = await indexedDBService.getUserByBadge(codeBadge);
+      if (u) {
+        await indexedDBService.cacheUser({
+          ...u,
+          solde: newBalance,
+          cachedAt: new Date().toISOString(),
+        });
+        console.log(`[OfflineAPI] Solde cache mis à jour pour ${codeBadge}: ${newBalance.toFixed(2)} MAD`);
+      }
+    } catch (e) {
+      console.warn('[OfflineAPI] Impossible de mettre à jour le solde en cache:', e);
+    }
+  }
+
+  /** Normalise les lignes si l'API n'envoie pas subventionTotale/partSalariale */
+  private normalizeTransactionArticles(tx: any) {
+    if (!tx || !Array.isArray(tx.articles)) return;
+    const lines = tx.articles;
+    const hasSubv = lines.some((a: any) => typeof a?.subventionTotale === 'number' && a.subventionTotale > 0);
+
+    if (!hasSubv) {
+      const totalCart = lines.reduce((s: number, a: any) => s + (a.montantTotal ?? (a.quantite * (a.prixUnitaire ?? 0))), 0);
+      const totalSubv = typeof tx.partPatronale === 'number' ? tx.partPatronale : 0;
+      const subvLines = this.distributeSubvention(
+        lines.map((a: any) => ({ montantTotal: a.montantTotal ?? (a.quantite * (a.prixUnitaire ?? 0)) })),
+        totalCart,
+        totalSubv
+      );
+      lines.forEach((a: any, i: number) => {
+        const pu = (typeof a.prixUnitaire === 'number') ? a.prixUnitaire : parseFloat(a.prixUnitaire ?? '0') || 0;
+        const mt = a.montantTotal ?? (a.quantite * pu);
+        const subv = Math.max(0, subvLines[i] ?? 0);
+        a.subventionTotale = subv;
+        a.partSalariale = Math.max(0, mt - subv);
+      });
+    } else {
+      lines.forEach((a: any) => {
+        const pu = (typeof a.prixUnitaire === 'number') ? a.prixUnitaire : parseFloat(a.prixUnitaire ?? '0') || 0;
+        const mt = a.montantTotal ?? (a.quantite * pu);
+        if (typeof a.subventionTotale !== 'number') a.subventionTotale = 0;
+        if (typeof a.partSalariale !== 'number') a.partSalariale = Math.max(0, mt - a.subventionTotale);
+      });
+    }
+  }
 
   private extractArticlesFromApiResponse(data: any): ArticleDTO[] {
     if (data?.content && Array.isArray(data.content)) return data.content;
@@ -479,34 +556,58 @@ class OfflineApiService {
     estimatedSubvention: number;
     estimatedToPay: number;
     articleDetails: ArticleDTO[];
-  }): Promise<{ success: boolean; data?: any; error?: string; isOffline: boolean }> {
+  }): Promise<CreateTransactionResult> {
     try {
       const now = new Date();
       const tempId = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const numeroTicket = `OFF-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(
-        now.getDate()
-      ).padStart(2, '0')}-${tempId.slice(-6)}`;
+      const numeroTicket = `OFF-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${tempId.slice(-6)}`;
+
+      // lignes brutes
+      const rawLines = transactionData.articles.map((item) => {
+        const a = transactionData.articleDetails.find((x) => x.id === item.articleId);
+        const pu = parseFloat(a?.prix ?? '0') || 0;
+        const mt = this.round2(item.quantite * pu);
+        return { articleId: item.articleId, nom: a?.nom || 'Article inconnu', quantite: item.quantite, prixUnitaire: pu, montantTotal: mt };
+      });
+
+      const cartTotal = this.round2(transactionData.cartTotal);
+
+      // Fallback subvention si 0
+      const fallbackSub = this.round2(cartTotal * this.fallbackSubRate);
+      const totalSubvention = transactionData.estimatedSubvention > 0
+        ? this.round2(transactionData.estimatedSubvention)
+        : fallbackSub;
+
+      const subvLines = this.distributeSubvention(
+        rawLines.map(l => ({ montantTotal: l.montantTotal })),
+        cartTotal,
+        totalSubvention
+      );
+
+      const lines = rawLines.map((l, i) => {
+        const subv = Math.max(0, subvLines[i] ?? 0);
+        const salar = this.round2(Math.max(0, l.montantTotal - subv));
+        return {
+          ...l,
+          subventionTotale: subv,
+          partSalariale: salar,
+          quantiteAvecSubvention: l.quantite,
+          quantiteSansSubvention: 0,
+        };
+      });
+
+      const partPatronale = this.round2(totalSubvention);
+      const partSalarialeTotale = this.round2(cartTotal - partPatronale);
+      const nouveauSolde = this.round2((transactionData.utilisateur.solde ?? 0) - partSalarialeTotale);
 
       const offlineTransaction: OfflineTransaction = {
         tempId,
         numeroTicket,
         date: now.toISOString(),
-        montantTotal: transactionData.cartTotal,
-        partSalariale: transactionData.estimatedToPay,
-        partPatronale: transactionData.estimatedSubvention,
-        articles: transactionData.articles.map((item) => {
-          const a = transactionData.articleDetails.find((x) => x.id === item.articleId);
-          const pu = parseFloat(a?.prix || '0');
-          return {
-            articleId: item.articleId,
-            nom: a?.nom || 'Article inconnu',
-            quantite: item.quantite,
-            prixUnitaire: pu,
-            montantTotal: item.quantite * pu,
-            subventionTotale: 0,
-            partSalariale: item.quantite * pu,
-          };
-        }),
+        montantTotal: cartTotal,
+        partSalariale: partSalarialeTotale,
+        partPatronale,
+        articles: lines,
         utilisateur: {
           id: transactionData.utilisateur.id,
           nom: transactionData.utilisateur.nom,
@@ -521,6 +622,11 @@ class OfflineApiService {
 
       if (this.dbReady) {
         await indexedDBService.storeOfflineTransaction(offlineTransaction);
+        // MAJ du solde dans le cache
+        const u = await indexedDBService.getUserByBadge(transactionData.utilisateur.codeBadge);
+        if (u) {
+          await indexedDBService.cacheUser({ ...u, solde: nouveauSolde, cachedAt: new Date().toISOString() });
+        }
       }
 
       console.log(`[OfflineAPI] Transaction offline créée: ${numeroTicket}`);
@@ -531,12 +637,12 @@ class OfflineApiService {
         message: 'Transaction enregistrée en mode offline',
         numeroTicket,
         utilisateurNomComplet: `${transactionData.utilisateur.prenom} ${transactionData.utilisateur.nom}`,
-        montantTotal: transactionData.cartTotal,
-        partSalariale: transactionData.estimatedToPay,
-        partPatronale: transactionData.estimatedSubvention,
+        montantTotal: cartTotal,
+        partSalariale: partSalarialeTotale,
+        partPatronale,
         soldeActuel: transactionData.utilisateur.solde,
-        nouveauSolde: transactionData.utilisateur.solde - transactionData.estimatedToPay,
-        articles: offlineTransaction.articles,
+        nouveauSolde,
+        articles: lines,
         transactionId: tempId,
       };
 
@@ -548,6 +654,5 @@ class OfflineApiService {
   }
 }
 
-// Instance singleton
 export const offlineApiService = new OfflineApiService();
 export default offlineApiService;

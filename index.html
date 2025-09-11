@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -12,15 +12,153 @@
     <meta property="og:type" content="website" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="/manifest.json" />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Préchargement de la vidéo -->
+    <link rel="preload" href="%BASE_URL%Negative-mask-effect.mp4" as="video" type="video/mp4" />
+
+    <style>
+      :root { --brand:#2563eb; }
+      html, body { height:100%; }
+      /* ✅ Page complètement blanche */
+      body {
+        margin:0;
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+        background:#fff !important;
+        color:#111827; /* texte gris foncé pour éviter blanc sur blanc */
+      }
+
+      /* Cache l'app pendant le splash */
+      #root { opacity: 0; transition: opacity .4s ease; }
+
+      /* ✅ Overlay plein écran, fond BLANC */
+      .splash-overlay {
+        position: fixed; inset: 0;
+        z-index: 9999;
+        background: #fff !important;   /* <-- blanc */
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+      }
+      .splash-overlay.hide {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .4s ease;
+      }
+
+      /* Vidéo centrée — fond blanc derrière la vidéo aussi */
+      .splash-video {
+        width: 70%;
+        height: 100%;
+        object-fit: contain;   /* garde les proportions */
+        display: block;
+        background:#fff;       /* <-- blanc derrière la vidéo (letterboxing) */
+      }
+
+      /* Bandeau de marque / bouton passer */
+      .splash-topbar {
+        position: absolute;
+        top: 16px; left: 16px; right: 16px;
+        display: flex; align-items: center; justify-content: space-between;
+        color: #111827; /* texte foncé pour fond blanc */
+        mix-blend-mode: normal;
+      }
+      .brand {
+        display: inline-flex; align-items: center; gap: 10px;
+        font-weight: 700; letter-spacing: .2px;
+      }
+      .brand-badge {
+        width: 36px; height: 36px; border-radius: 8px;
+        background: var(--brand);
+        display: grid; place-items: center;
+        color: #fff; font-weight: 800;
+      }
+      .skip-btn {
+        appearance: none; border: 0;
+        padding: 8px 12px; border-radius: 999px;
+        background: rgba(17,24,39,.06);
+        color:#111827; font-weight:600; cursor:pointer;
+        backdrop-filter: blur(6px);
+      }
+      .skip-btn:hover { background: rgba(17,24,39,.12); }
+      .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+
+      .skip-btn { display: none !important; }
+      
+    </style>
   </head>
 
   <body>
+    <!-- Splash / Intro video -->
+    <div class="splash-overlay" id="splash">
+      <div class="splash-topbar">
+        <div class="brand" aria-label="EasyPOS">
+          <div class="brand-badge" aria-hidden="true">EP</div>
+          <div>EasyPOS</div>
+        </div>
+        <button id="splashSkip" class="skip-btn" type="button">Passer</button>
+      </div>
+
+      <video
+        id="splashVideo"
+        class="splash-video"
+        playsinline
+        muted
+        autoplay
+        preload="auto"
+        poster="%BASE_URL%Negative-mask-effect.jpg"
+      >
+        <source src="%BASE_URL%Negative-mask-effect.mp4" type="video/mp4" />
+        Votre navigateur ne supporte pas la vidéo HTML5.
+      </video>
+      <span class="sr-only">Animation de démarrage EasyPOS</span>
+    </div>
+
+    <!-- Racine de l'app -->
     <div id="root"></div>
+
+    <!-- L'app démarre en parallèle mais masquée sous l'overlay -->
     <script type="module" src="/src/main.tsx"></script>
+
+    <!-- Gestion de l’overlay -->
+    <script>
+      (function () {
+        const splash = document.getElementById('splash');
+        const video  = document.getElementById('splashVideo');
+        const root   = document.getElementById('root');
+        const skip   = document.getElementById('splashSkip');
+
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const SAFETY_TIMEOUT_MS = 5000;
+        let done = false;
+
+        const finish = () => {
+          if (done) return;
+          done = true;
+          splash.classList.add('hide');
+          root.style.opacity = '1';
+          setTimeout(() => splash.remove(), 600);
+        };
+
+        skip.addEventListener('click', finish);
+
+        if (prefersReducedMotion) { finish(); return; }
+
+        const safe = setTimeout(finish, SAFETY_TIMEOUT_MS);
+        video.addEventListener('ended', () => { clearTimeout(safe); finish(); });
+        video.addEventListener('error', () => { clearTimeout(safe); finish(); });
+        video.addEventListener('abort', () => { clearTimeout(safe); finish(); });
+
+        video.play().catch(() => { finish(); });
+      })();
+    </script>
   </body>
 </html>
